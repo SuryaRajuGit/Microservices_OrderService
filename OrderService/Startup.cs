@@ -20,6 +20,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Order_Service.Repository;
 
 namespace Order_Service
 {
@@ -36,8 +37,9 @@ namespace Order_Service
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddDbContext<OrderContext>(options => options.UseSqlServer(Configuration.GetConnectionString("OrderServiceDB")));
-            services.AddControllers();
+            services.AddControllers(); 
             services.AddTransient<IOrderService, OrderService>();
+            services.AddTransient<IOrderRepository, OrderRepository>();
             services.AddHttpClient("product", config =>
                  config.BaseAddress = new System.Uri("http://localhost:5000"));
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
