@@ -5,10 +5,12 @@ using System.Threading.Tasks;
 
 namespace Order_Service.Entities.Dtos
 {
-    public class CartToWishList
+    public class CheckOutResponseDTO
     {
-        public Guid WishListId { get; set; }
+        public Address Address  { get; set; }
 
-        public Guid ProductId { get; set; }
+        public Payment Payment { get; set; }
+
+        
     }
 }

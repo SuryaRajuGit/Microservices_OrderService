@@ -5,23 +5,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Order_Service.Contracts;
 using Order_Service.Entity.Model;
 using Order_Service.Services;
-using Order_Service.Contracts;
-using Order_Service.Entity.Model;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Order_Service.Repository;
-
 namespace Order_Service
 {
     public class Startup
@@ -43,6 +36,10 @@ namespace Order_Service
             services.AddHttpClient("product", config =>
                  config.BaseAddress = new System.Uri("http://localhost:5000"));
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            services.AddControllersWithViews()
+            .AddNewtonsoftJson(options =>
+            options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
+            );
             services.AddAuthentication(option =>
             {
                 option.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

@@ -5,15 +5,17 @@ using System.Threading.Tasks;
 
 namespace Order_Service.Entity.Model
 {
-    public class Payment
+    public class Bill
     {
         public Guid Id { get; set; }
 
-        public int BillId { get; set; }
-        public Cart BillNo { get; set; }
+        public int BillNo { get; set; }
+        public Cart cart { get; set; }
 
         public float OrderValue { get; set; }
 
         public string PaymentType { get; set; }
+
+        public string ShippingAddress { get; set; }
     }
 }

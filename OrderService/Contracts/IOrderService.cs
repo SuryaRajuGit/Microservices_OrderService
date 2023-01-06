@@ -12,6 +12,8 @@ namespace Order_Service.Contracts
     {
         public ErrorDTO ModelStateInvalid(ModelStateDictionary ModelState);
 
+        public Task<ErrorDTO> CartProductsExist(List<ProductToCartDTO> productToCartDTOs);
+
         public Task<ErrorDTO> IsTheproductExists(Guid id,Guid categoryId);
 
         public void AddProduct(ProductToCartDTO productToCartDTO);
@@ -30,6 +32,35 @@ namespace Order_Service.Contracts
 
         public ErrorDTO DeleteProductCart(Guid id);
 
-        public ErrorDTO IsProductExistsInCart(CartToWishList cartTOWishList);
+        public ErrorDTO IsProductExistsInCart(WishListToCart cartTOWishList);
+
+        public Task<CheckOutResponse> CheckOut(SingleProductCheckOutDTO singleProductCheckOutDTO);
+
+        public void CreateCart(Guid id);
+
+        public Task<ErrorDTO> IsQunatityLeft();
+
+        public ErrorDTO isCartIdExist(Guid id);
+
+        public Task<CheckOutResponse> CheckOutCart(CheckOutCart checkOutCart);
+
+        public ErrorDTO CheckWishList(Guid wishListId);
+
+        public Task<List<ProductDTO>> GetProductsInCart();
+
+        public ErrorDTO IsWishListExist(Guid id);
+
+        public Task<List<WishListProductDTO>> GetWishListProducts(Guid id);
+
+        public Guid GetWishListId(string name);
+
+        public Task<ErrorDTO> IsPurchaseDetailsExist(CheckOutCart checkOutCart);
+
+        public Task<ErrorDTO> IsPurchaseDetailsExist(SingleProductCheckOutDTO singleProductCheckOutDTO);
+
+        public void  DeleteUserData(Guid id);
+
+        public ErrorDTO IsUserExist();
+
     }
 }

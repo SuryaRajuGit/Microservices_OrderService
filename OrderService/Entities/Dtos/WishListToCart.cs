@@ -7,18 +7,14 @@ using System.Threading.Tasks;
 
 namespace Order_Service.Entities.Dtos
 {
-    public class WishListproduct
+    public class WishListToCart
     {
         [Required]
-        [JsonProperty("wishList_id")]
-        public Guid WishListId { get; set; }
+        [JsonProperty("wish_list_id")]
+        public string WishListId { get; set; }
 
         [Required]
         [JsonProperty("product_id")]
-        public Guid ProductId { get; set; }
-
-        [Required]
-        [JsonProperty("category_id")]
-        public Guid CategoryId { get; set; }
+        public string ProductId { get; set; }
     }
 }

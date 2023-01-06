@@ -15,7 +15,7 @@ namespace Order_Service.Entity.Model
 
         public DbSet<Cart> Cart { get; set; }
 
-        public DbSet<Payment> Payment { get; set; }
+        public DbSet<Bill> Bill { get; set; }
 
         public DbSet<Product> Product { get; set; }
 
