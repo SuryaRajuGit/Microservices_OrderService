@@ -10,8 +10,8 @@ using Order_Service.Entity.Model;
 namespace Order_Service.Migrations
 {
     [DbContext(typeof(OrderContext))]
-    [Migration("20230103140641_n5")]
-    partial class n5
+    [Migration("20230108032345_n2")]
+    partial class n2
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -23,28 +23,26 @@ namespace Order_Service.Migrations
 
             modelBuilder.Entity("Order_Service.Entity.Model.Bill", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<Guid>("AddressId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("BillNo")
-                        .HasColumnType("int");
+                    b.Property<Guid>("CartId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<float>("OrderValue")
                         .HasColumnType("real");
 
-                    b.Property<string>("PaymentType")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ShippingAddress")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid?>("cartId")
+                    b.Property<Guid>("PaymentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("cartId");
+                    b.HasIndex("CartId");
 
                     b.ToTable("Bill");
                 });
@@ -126,9 +124,11 @@ namespace Order_Service.Migrations
 
             modelBuilder.Entity("Order_Service.Entity.Model.Bill", b =>
                 {
-                    b.HasOne("Order_Service.Entity.Model.Cart", "cart")
+                    b.HasOne("Order_Service.Entity.Model.Cart", "Cart")
                         .WithMany("Bill")
-                        .HasForeignKey("cartId");
+                        .HasForeignKey("CartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Order_Service.Entity.Model.Product", b =>

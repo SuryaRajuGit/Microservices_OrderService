@@ -34,15 +34,15 @@ namespace Order_Service.Contracts
 
         public ErrorDTO IsProductExistsInCart(WishListToCart cartTOWishList);
 
-        public Task<CheckOutResponse> CheckOut(SingleProductCheckOutDTO singleProductCheckOutDTO);
+        public Task<int> CheckOut(SingleProductCheckOutDTO singleProductCheckOutDTO);
 
         public void CreateCart(Guid id);
 
-        public Task<ErrorDTO> IsQunatityLeft();
+        public Task<ErrorDTO> IsQunatityLeft(Guid id,int quantity);
 
         public ErrorDTO isCartIdExist(Guid id);
 
-        public Task<CheckOutResponse> CheckOutCart(CheckOutCart checkOutCart);
+        public Task<int?> CheckOutCart(CheckOutCart checkOutCart);
 
         public ErrorDTO CheckWishList(Guid wishListId);
 
@@ -61,6 +61,11 @@ namespace Order_Service.Contracts
         public void  DeleteUserData(Guid id);
 
         public ErrorDTO IsUserExist();
+
+        public List<OrderResponseDTO> GetOrderDetails(int billNo);
+
+        public ErrorDTO IsOrderIdExist(int id);
+
 
     }
 }

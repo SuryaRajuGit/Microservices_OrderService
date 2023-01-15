@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Order_Service.Migrations
 {
-    public partial class @new : Migration
+    public partial class n : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -12,7 +12,8 @@ namespace Order_Service.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(nullable: false),
-                    UserId = table.Column<Guid>(nullable: false)
+                    UserId = table.Column<Guid>(nullable: false),
+                    BillNo = table.Column<int>(nullable: false)
                 },
                 constraints: table =>
                 {
@@ -33,24 +34,25 @@ namespace Order_Service.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Payment",
+                name: "Bill",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(nullable: false),
-                    BillId = table.Column<int>(nullable: false),
-                    BillNoId = table.Column<Guid>(nullable: true),
+                    Id = table.Column<int>(nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CartId = table.Column<Guid>(nullable: false),
                     OrderValue = table.Column<float>(nullable: false),
-                    PaymentType = table.Column<string>(nullable: true)
+                    PaymentId = table.Column<Guid>(nullable: false),
+                    ShippingAddress = table.Column<string>(nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Payment", x => x.Id);
+                    table.PrimaryKey("PK_Bill", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Payment_Cart_BillNoId",
-                        column: x => x.BillNoId,
+                        name: "FK_Bill_Cart_CartId",
+                        column: x => x.CartId,
                         principalTable: "Cart",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -93,9 +95,9 @@ namespace Order_Service.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Payment_BillNoId",
-                table: "Payment",
-                column: "BillNoId");
+                name: "IX_Bill_CartId",
+                table: "Bill",
+                column: "CartId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Product_CartId",
@@ -111,7 +113,7 @@ namespace Order_Service.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Payment");
+                name: "Bill");
 
             migrationBuilder.DropTable(
                 name: "Product");

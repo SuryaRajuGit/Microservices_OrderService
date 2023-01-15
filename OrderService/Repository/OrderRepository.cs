@@ -123,7 +123,7 @@ namespace Order_Service.Repository
                 {
                     if (term.ProductId == id)
                     {
-                        var p = _orderContext.Product.First(find => find.ProductId == id);
+                        var p = _orderContext.Product.Where(find => find.ProductId == id).FirstOrDefault();
                         _orderContext.Product.Remove(p);
                         _orderContext.SaveChanges();
                         return true;
@@ -186,7 +186,7 @@ namespace Order_Service.Repository
             }
             _orderContext.WishListProduct.Add(productWishlist);
             _orderContext.SaveChanges();
-            return true;
+            return false;
             
             //if(b == null)
             //{
@@ -229,25 +229,23 @@ namespace Order_Service.Repository
             }
             return false;
         }
-        public int GenerateBillNo(Bill payment,Guid cartId)
+        public int GenerateBillNo(Cart cart, Bill bill, Guid cartId)
         {
-            var x = _orderContext.Cart.Include(term => term.Bill).Where(find => find.Id == cartId).First();
-            var c = _orderContext.Cart.Select(term => term.Bill).Count();
-            x.BillNo = c;
-            foreach (var item in x.Bill)
-            {
-                item.BillNo = c;
-            }
-            Cart cart = new Cart()
+            
+            //foreach (var item in x.Bill)
+            //{
+            //    item.Id = c;
+            //}
+            Cart cart1 = new Cart()
             {
                 Id = Guid.NewGuid(),
-                UserId = x.UserId
+                UserId = cart.UserId
             };
-            
-            _orderContext.Cart.Update(x);
-            _orderContext.Cart.Add(cart);
+            _orderContext.Cart.Update(cart);
+            _orderContext.Bill.Add(bill);
+            _orderContext.Cart.Add(cart1);
             _orderContext.SaveChanges();
-            return c;
+            return bill.Id;
         }
         public Tuple<string, string> IsProductExistInCart(WishListToCart cartTOWishList,Guid userId)
         {
@@ -289,16 +287,26 @@ namespace Order_Service.Repository
         }
         public int GetBillNo()
         {
-            return _orderContext.Cart.Select(sel => sel.BillNo).Count() + 1;
+            var max = 0;
+            foreach (var item in _orderContext.Bill)
+            {
+                var t = item.Id;
+                if(t > max)
+                {
+                    max = t;
+                }
+            }
+            return max + 1;
         }
         public void CheckOut(Cart cart, Guid userId)
         {
-            //var o = _orderContext.Cart.Select(sel => sel.BillNo).Count() + 1;
+           // var o = _orderContext.Cart.Select(sel => sel.BillNo).Count() + 1;
             //cart.BillNo = o;
             //foreach (var item in cart.Bill)
             //{
             //    item.BillNo = o;
             //}
+           // cart
             _orderContext.Cart.Add(cart);
             _orderContext.SaveChanges();
            // return o;
@@ -358,11 +366,35 @@ namespace Order_Service.Repository
         }
         public bool IsUserExist(Guid userId)
         {
-            return _orderContext.Cart.Any(find =>find.UserId == userId);
+            return _orderContext.Cart.Any(find => find.UserId == userId);
         }
         public bool IsTheUserExist(Guid userId)
         {
             return _orderContext.Cart.Any(find => find.UserId == userId);
+        }
+
+        public List<Bill> GetOrderDetails(Guid userId)
+        {
+            //return _orderContext.Cart.Include(src => src.Bill).Where(find => find.UserId == userId && find.BillNo != 0).Select(src => src.Bill).FirstOrDefault();
+            List<Bill> bill = new List<Bill>();
+            foreach (var item in _orderContext.Cart.Include(src=>src.Bill).Where(find =>find.UserId == userId))
+            {
+                if(item.BillNo != 0)
+                {
+                    var b = item.Bill.First();
+                    b.Cart = null;
+                    bill.Add(b);
+                }
+            }
+            return bill;
+        }
+        public Bill GetOrderDetails(Guid userId, int billNo)
+        {
+            return _orderContext.Bill.Where(find => find.Id == billNo).First();
+        }
+        public bool IsOrderIdExist(int id)
+        {
+            return _orderContext.Bill.Any(src => src.Id == id);
         }
     }
 }

@@ -15,6 +15,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Order_Service.Repository;
+using Microsoft.Extensions.Logging;
+using Order_Service.Controllers;
+
 namespace Order_Service
 {
     public class Startup
@@ -30,11 +33,15 @@ namespace Order_Service
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddDbContext<OrderContext>(options => options.UseSqlServer(Configuration.GetConnectionString("OrderServiceDB")));
-            services.AddControllers(); 
+            services.AddControllers();
             services.AddTransient<IOrderService, OrderService>();
             services.AddTransient<IOrderRepository, OrderRepository>();
             services.AddHttpClient("product", config =>
                  config.BaseAddress = new System.Uri("http://localhost:5000"));
+            services.AddAutoMapper(typeof(Startup));
+            var serviceProvider = services.BuildServiceProvider();
+            var logger = serviceProvider.GetService<ILogger<OrderController>>();
+            services.AddSingleton(typeof(ILogger), logger);
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             services.AddControllersWithViews()
             .AddNewtonsoftJson(options =>

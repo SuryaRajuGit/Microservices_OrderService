@@ -10,8 +10,8 @@ using Order_Service.Entity.Model;
 namespace Order_Service.Migrations
 {
     [DbContext(typeof(OrderContext))]
-    [Migration("20221219095318_new")]
-    partial class @new
+    [Migration("20230107073745_n")]
+    partial class n
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -21,11 +21,40 @@ namespace Order_Service.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128)
                 .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-            modelBuilder.Entity("OrderService.Entity.Model.Cart", b =>
+            modelBuilder.Entity("Order_Service.Entity.Model.Bill", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<Guid>("CartId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<float>("OrderValue")
+                        .HasColumnType("real");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ShippingAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CartId");
+
+                    b.ToTable("Bill");
+                });
+
+            modelBuilder.Entity("Order_Service.Entity.Model.Cart", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("BillNo")
+                        .HasColumnType("int");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
@@ -35,32 +64,7 @@ namespace Order_Service.Migrations
                     b.ToTable("Cart");
                 });
 
-            modelBuilder.Entity("OrderService.Entity.Model.Payment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("BillId")
-                        .HasColumnType("int");
-
-                    b.Property<Guid?>("BillNoId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<float>("OrderValue")
-                        .HasColumnType("real");
-
-                    b.Property<string>("PaymentType")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BillNoId");
-
-                    b.ToTable("Payment");
-                });
-
-            modelBuilder.Entity("OrderService.Entity.Model.Product", b =>
+            modelBuilder.Entity("Order_Service.Entity.Model.Product", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -82,7 +86,7 @@ namespace Order_Service.Migrations
                     b.ToTable("Product");
                 });
 
-            modelBuilder.Entity("OrderService.Entity.Model.WishList", b =>
+            modelBuilder.Entity("Order_Service.Entity.Model.WishList", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -99,7 +103,7 @@ namespace Order_Service.Migrations
                     b.ToTable("WishList");
                 });
 
-            modelBuilder.Entity("OrderService.Entity.Model.WishListProduct", b =>
+            modelBuilder.Entity("Order_Service.Entity.Model.WishListProduct", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -118,25 +122,27 @@ namespace Order_Service.Migrations
                     b.ToTable("WishListProduct");
                 });
 
-            modelBuilder.Entity("OrderService.Entity.Model.Payment", b =>
+            modelBuilder.Entity("Order_Service.Entity.Model.Bill", b =>
                 {
-                    b.HasOne("OrderService.Entity.Model.Cart", "BillNo")
-                        .WithMany("BillNo")
-                        .HasForeignKey("BillNoId");
+                    b.HasOne("Order_Service.Entity.Model.Cart", "Cart")
+                        .WithMany("Bill")
+                        .HasForeignKey("CartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
-            modelBuilder.Entity("OrderService.Entity.Model.Product", b =>
+            modelBuilder.Entity("Order_Service.Entity.Model.Product", b =>
                 {
-                    b.HasOne("OrderService.Entity.Model.Cart", "Cart")
+                    b.HasOne("Order_Service.Entity.Model.Cart", "Cart")
                         .WithMany("Product")
                         .HasForeignKey("CartId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("OrderService.Entity.Model.WishListProduct", b =>
+            modelBuilder.Entity("Order_Service.Entity.Model.WishListProduct", b =>
                 {
-                    b.HasOne("OrderService.Entity.Model.WishList", "WishList")
+                    b.HasOne("Order_Service.Entity.Model.WishList", "WishList")
                         .WithMany("WishListProduct")
                         .HasForeignKey("WishListId")
                         .OnDelete(DeleteBehavior.Cascade)

@@ -43,9 +43,15 @@ namespace Order_Service.Controllers
             {
                 return StatusCode(500,ex.Message);
             }
+            ErrorDTO response = await _orderService.IsQunatityLeft(productToCartDTO.ProductId,productToCartDTO.Quantity);
+            if(response != null)
+            {
+                return StatusCode(204,response);
+            }
             _orderService.AddProduct(productToCartDTO);
             return Ok("Product added to cart sucessfully");
         }
+
         [HttpPost]
         [Route("api/cart/create")]
         [AllowAnonymous]
@@ -113,6 +119,7 @@ namespace Order_Service.Controllers
             Guid id = _orderService.GetWishListId(newWwishListProduct.Name);
             return StatusCode(201,id);
         }
+
         [HttpDelete]
         [Route("api/user/{id}")]
         public void DeleteUser([FromRoute] Guid id)
@@ -137,6 +144,7 @@ namespace Order_Service.Controllers
             }
             return Ok("Wish List deleted Successfully");
         }
+
         [HttpPost]
         [Route("api/wish-list/product")]
         [Authorize(Roles = "User,Admin")]
@@ -147,11 +155,19 @@ namespace Order_Service.Controllers
                 ErrorDTO badRequest = _orderService.ModelStateInvalid(ModelState);
                 return BadRequest(badRequest);
             }
-            ErrorDTO isTheProductExists = await _orderService.IsTheproductExists(wishListProduct.ProductId, wishListProduct.CategoryId);
-            if (isTheProductExists != null)
+            try
             {
-                return StatusCode(404, isTheProductExists);
+                ErrorDTO isTheProductExists = await _orderService.IsTheproductExists(wishListProduct.ProductId, wishListProduct.CategoryId);
+                if (isTheProductExists != null)
+                {
+                    return StatusCode(404, isTheProductExists);
+                }
             }
+            catch(Exception ex)
+            {
+                return StatusCode(500,ex.Message);
+            }
+            
             ErrorDTO isWishListExist = _orderService.CheckWishList(wishListProduct.WishListId);
             if (isWishListExist != null)
             {
@@ -164,6 +180,7 @@ namespace Order_Service.Controllers
             }
             return Ok("Product added to Wish list Successfully");
         }
+
         [HttpDelete]
         [Authorize(Roles = "Admin,User")]
         [Route("api/wish-list/{id}/product/{product-id}")]
@@ -181,6 +198,7 @@ namespace Order_Service.Controllers
             }
             return Ok("Product removed from wish list successfully.");
         }
+
         [HttpPost]
         [Authorize(Roles = "Admin,User")]
         [Route("api/cart/wish-list")]
@@ -198,6 +216,7 @@ namespace Order_Service.Controllers
             }
             return Ok("Product moved from wish list to cart Successfully");
         }
+
         [HttpPost]
         [Authorize(Roles = "Admin,User")]
         [Route("api/check-out/product")]
@@ -225,17 +244,17 @@ namespace Order_Service.Controllers
             {
                 return StatusCode(500,ex.Message);
             }
-
-        //    try
-        //    {
-                CheckOutResponse checkOutResponse = await _orderService.CheckOut(singleProductCheckOutDTO);
-                return Ok(checkOutResponse);
-         //   }
-         //   catch (Exception ex)
-         //   {
-          //      return StatusCode(404, ex.Message);
-          //  };
+            try
+            {
+                int response = await _orderService.CheckOut(singleProductCheckOutDTO);
+                return StatusCode(201,response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(204, ex.Message);
+            };
         }
+
         [HttpPost]
         [Authorize(Roles = "Admin,User")]
         [Route("api/check-out/cart")]
@@ -261,7 +280,7 @@ namespace Order_Service.Controllers
             
             try
             {
-                ErrorDTO response = await _orderService.IsQunatityLeft();
+                ErrorDTO response = await _orderService.IsQunatityLeft(Guid.Empty,0);
                 if (response != null)
                 {
                     return StatusCode(404, response);
@@ -271,18 +290,18 @@ namespace Order_Service.Controllers
             {
                 StatusCode(500, ex.Message);
             }
-            CheckOutResponse checkOutProduct =await _orderService.CheckOutCart(checkOutCart);           
+            int? checkOutProduct =await _orderService.CheckOutCart(checkOutCart);           
             if(checkOutProduct == null)
             {
-                return StatusCode(201,"Cart is Empty");
+                return StatusCode(204,"Cart is Empty");
             }
-            return Ok(checkOutProduct);
+            return StatusCode(201,checkOutProduct);
         }
 
         [HttpGet]
         [Authorize(Roles = "Admin,User")]
         [Route("api/cart")]
-        public async Task<ActionResult<List<ProductDTO>>> GetProductsInCart()
+        public async Task<ActionResult> GetProductsInCart()
         {
             ErrorDTO isUserExist = _orderService.IsUserExist();
             if(isUserExist != null)
@@ -298,9 +317,9 @@ namespace Order_Service.Controllers
                 }
                 return Ok(products);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                return StatusCode(500,ex.Message);
+                return StatusCode(500, ex.Message);
             }
         }
 
@@ -328,6 +347,44 @@ namespace Order_Service.Controllers
                 return StatusCode(500,ex.Message);
             }
             
+        }
+        
+        [HttpGet]
+        [Authorize(Roles = "Admin,User")]
+        [Route("api/order")]
+        public IActionResult OrderDetails()
+        {
+            ErrorDTO isUserExist = _orderService.IsUserExist();
+            if (isUserExist != null)
+            {
+                return StatusCode(404, isUserExist);
+            }
+
+            List<OrderResponseDTO> orderDetails = _orderService.GetOrderDetails(0);
+            if(orderDetails == null)
+            {
+                return StatusCode(204,"No Orders placed");
+            }
+            return Ok(orderDetails);
+        }
+        
+        [HttpGet]
+        [Authorize(Roles = "Admin,User")]
+        [Route("api/order/{id}")]
+        public IActionResult OrderDetail([FromRoute] int id)
+        {
+            ErrorDTO isUserExist = _orderService.IsUserExist();
+            if (isUserExist != null)
+            {
+                return StatusCode(404, isUserExist);
+            }
+            ErrorDTO isOrderIdExist = _orderService.IsOrderIdExist(id);
+            if(isOrderIdExist != null)
+            {
+                return NotFound(isOrderIdExist);
+            }
+            List<OrderResponseDTO> orderDetails = _orderService.GetOrderDetails(id);
+            return Ok(orderDetails);
         }
     }
 }

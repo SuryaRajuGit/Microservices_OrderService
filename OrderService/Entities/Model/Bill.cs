@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -7,15 +8,16 @@ namespace Order_Service.Entity.Model
 {
     public class Bill
     {
-        public Guid Id { get; set; }
+       
+        public int Id { get; set; }
 
-        public int BillNo { get; set; }
-        public Cart cart { get; set; }
+        public Guid CartId { get; set; }
+        public Cart Cart { get; set; }
 
         public float OrderValue { get; set; }
 
-        public string PaymentType { get; set; }
+        public Guid PaymentId { get; set; }
 
-        public string ShippingAddress { get; set; }
+        public Guid AddressId { get; set; }
     }
 }

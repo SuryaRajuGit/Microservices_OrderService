@@ -18,6 +18,6 @@ namespace Order_Service.Entities.Dtos
         public string PaymentType { get; set; }
 
         [JsonProperty(PropertyName = "shipping_address")]
-        public string ShippingAddress { get; set; }
+        public Guid ShippingAddress { get; set; }
     }
 }

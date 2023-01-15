@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNet.Identity;
+﻿
+using AutoMapper;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Order_Service.Contracts;
 using Order_Service.Entities.Dtos;
 using Order_Service.Entity.DTo;
@@ -13,13 +14,12 @@ using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http;
+using Constants = Order_Service.Entities.Dtos.Constants;
 using WishListProduct = Order_Service.Entity.Model.WishListProduct;
 
 namespace Order_Service.Services
@@ -29,12 +29,22 @@ namespace Order_Service.Services
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IHttpContextAccessor _context;
         private readonly IOrderRepository _orderRepository;
+        private readonly IMapper _mapper;
 
-        public OrderService(IHttpClientFactory httpClientFactory, IHttpContextAccessor context,IOrderRepository orderRepository)
+        public OrderService( IHttpContextAccessor context,IOrderRepository orderRepository, IMapper mapper)
         {
-            _httpClientFactory = httpClientFactory;
+            //_httpClientFactory = httpClientFactory;
             _context = context;
+            _mapper = mapper;
             _orderRepository = orderRepository;
+            IHostBuilder hostBuilder1 = Host.CreateDefaultBuilder()
+                .ConfigureServices(Services =>
+                {
+                    Services.AddHttpClient("product", config =>
+            config.BaseAddress = new System.Uri("http://localhost:5000"));
+                });
+            IHost host1 = hostBuilder1.Build();
+            _httpClientFactory = host1.Services.GetRequiredService<IHttpClientFactory>();
         }
         public ErrorDTO ModelStateInvalid(ModelStateDictionary ModelState)
         {
@@ -47,15 +57,15 @@ namespace Order_Service.Services
         public string AccessToken(string id)
         {
             JwtSecurityTokenHandler tokenhandler = new JwtSecurityTokenHandler();
-            byte[] tokenKey = Encoding.UTF8.GetBytes("thisismySecureKey12345678");
+            byte[] tokenKey = Encoding.UTF8.GetBytes(Constants.SecurityKey);
 
             SecurityTokenDescriptor tokenDeprictor = new SecurityTokenDescriptor
             {
                 Subject = new System.Security.Claims.ClaimsIdentity(
                 new Claim[]
                 {
-                     new Claim("role","User"),
-                     new Claim("Id",id)
+                    new Claim(Constants.Role,Constants.User),
+                     new Claim(Constants.Id,id)
                 }
                 ),
                 Expires = DateTime.UtcNow.AddMinutes(90),
@@ -68,15 +78,15 @@ namespace Order_Service.Services
         }
         public async Task<ErrorDTO> CartProductsExist(List<ProductToCartDTO> productToCartDTOs)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
-            var i = _orderRepository.GetCartProducts(Guid.Parse(userId));
-            if(i == null)
+            string userId = _context.HttpContext.User.Claims.First(term => term.Type == Constants.Id).Value;
+            Cart cart = _orderRepository.GetCartProducts(Guid.Parse(userId));
+            if(cart == null)
             {
                 return new ErrorDTO() {type="Cart",description=$"Cart is Empty" };
             }
 
             List<Guid> productIds = new List<Guid>();
-            foreach (var item in productToCartDTOs)
+            foreach (ProductToCartDTO item in productToCartDTOs)
             {
                 productIds.Add(item.ProductId);
             }
@@ -98,46 +108,44 @@ namespace Order_Service.Services
                 return new ErrorDTO() { type = "Product", description = id + " Product id not found" };
             }
             return null;
-            
-
         }
 
-        public async   Task<ErrorDTO> IsTheproductExists(Guid id,Guid categoryId)
+        public async Task<ErrorDTO> IsTheproductExists(Guid id,Guid categoryId)
         {
             using HttpClient client = _httpClientFactory.CreateClient("product");
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
-            var t = _orderRepository.IsTheUserExist(Guid.Parse(userId));
-            if(!t)
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
+            bool isUserExist = _orderRepository.IsTheUserExist(Guid.Parse(userId));
+            if(!isUserExist)
             {
                 return new ErrorDTO() {type="User",description="User Account deleted" };
             }
             string accessToken = AccessToken(userId);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",accessToken);
-            HttpResponseMessage response = await client.GetAsync($"/api/product/ocelot?id={id}&categoryId={categoryId}");
+            HttpResponseMessage response =  client.GetAsync($"/api/product/ocelot?id={id}&categoryId={categoryId}").Result;
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception("Product Service is unavailable");
             }
             string result =await response.Content.ReadAsStringAsync();
 
-            var s = JsonConvert.DeserializeObject(result).ToString();
-            var d = JsonConvert.DeserializeObject<QuantityResponse>(s);
-            if(d.type == "category")
+            string responseString = JsonConvert.DeserializeObject(result).ToString();
+            QuantityResponse quantityResponse = JsonConvert.DeserializeObject<QuantityResponse>(responseString);
+            if(quantityResponse.type == "category")
             {
-                return new ErrorDTO() { type = "Category", description = categoryId.ToString() };
+                return new ErrorDTO() { type = "Category", description = quantityResponse.description };
             }
-            
-            if (d.type == "product")
+            if (quantityResponse.type == "product")
             {
-                return new ErrorDTO { type = "Product", description =id.ToString()  }; 
+                return new ErrorDTO { type = "Product", description = quantityResponse.description };
             }
-           
+
+
             return null;
         }
         public void AddProduct(ProductToCartDTO productToCartDTO)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
 
             Product product = new Product()
             {
@@ -151,7 +159,7 @@ namespace Order_Service.Services
 
         public ErrorDTO IsProductInCart(Guid id)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
             bool isProductInCart = _orderRepository.IsProductInCart(id,Guid.Parse(userId));
             if(isProductInCart)
             {
@@ -162,42 +170,23 @@ namespace Order_Service.Services
 
         public ErrorDTO UpdateProductQuantity(UpdateCart updateCart)
         {
-            
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
             Cart? cart = _orderRepository.GetCart(Guid.Parse(userId));
-            var x = cart.Product.Any(find =>find.ProductId == updateCart.ProductId);
-            if (!x)
+            bool isProductExist = cart.Product.Any(find =>find.ProductId == updateCart.ProductId);
+            if (!isProductExist)
             {
                 return new ErrorDTO { type = "Product", description = "Product with id not found in Cart" };
             }
-            foreach (var item in cart.Product)
+            foreach (Product item in cart.Product)
             {
                 item.Quantity = updateCart.Quantity;
-            }
-           
-
-            //Cart cart = new Cart()
-            //{
-            //    Id = updateCart.CartId,
-            //    UserId = Guid.Parse(userId),
-            //    Product = new List<Product>(),
-               
-            //};
-            //Guid idd = Guid.NewGuid();
-            //Product product = new Product()
-            //{
-                
-            //    CartId = updateCart.CartId,
-            //    ProductId = updateCart.ProductId,
-            //    Quantity = updateCart.Quantity
-            //};
-           // cart.Product.Add(product);
+            }  
              _orderRepository.UpdateCart(cart);
             return null;
         }
         public ErrorDTO IsWishListNameExists(NewWishListProduct newWishListProduct)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
             Guid id = Guid.NewGuid();
             WishList wishList = new WishList()
             {
@@ -226,13 +215,14 @@ namespace Order_Service.Services
         }
         public ErrorDTO SaveProductWishList(WishListproduct wishListProduct)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == "Id").Value;
             Guid id = Guid.NewGuid();
             
-            WishListProduct productWishlist = new WishListProduct() { Id = Guid.NewGuid(), ProductId = wishListProduct.ProductId, WishListId = wishListProduct.WishListId };
+            WishListProduct productWishlist = new WishListProduct() { Id = Guid.NewGuid(),
+                ProductId = wishListProduct.ProductId, WishListId = wishListProduct.WishListId };
 
-            bool b = _orderRepository.SaveProductWishList(productWishlist);
-            if(b)
+            bool saveProduct = _orderRepository.SaveProductWishList(productWishlist);
+            if(saveProduct)
             {
                 return new ErrorDTO() {type="Product",description="Product already added to wish list" };
             }
@@ -241,8 +231,8 @@ namespace Order_Service.Services
         }
         public ErrorDTO CheckWishList(Guid wishListId)
         {
-            var t = _orderRepository.CheckWishList(wishListId);
-            if(!t)
+            bool isWishListExist = _orderRepository.CheckWishList(wishListId);
+            if(!isWishListExist)
             {
                 return new ErrorDTO() {type="Wish List",description="Wish list id not found" };
             }
@@ -251,20 +241,20 @@ namespace Order_Service.Services
 
         public ErrorDTO DeleteProductWishList(Guid id, Guid productId)
         {
-            Tuple<string,string> x = _orderRepository.DeleteProductWishList(id, productId);
-            switch (x.Item1)
+            Tuple<string,string> response = _orderRepository.DeleteProductWishList(id, productId);
+            switch (response.Item1)
             {
                 case ("wishlist"):
-                    return new ErrorDTO { type = x.Item1, description = "Wish List with Id not found" };
+                    return new ErrorDTO { type = response.Item1, description = "Wish List with Id not found" };
                 case ("product"):
-                    return new ErrorDTO { type = x.Item1, description = "Product with Id not found" };
+                    return new ErrorDTO { type = response.Item1, description = "Product with Id not found" };
                 default:
                     return null;
             }
         }
         public ErrorDTO DeleteProductCart(Guid id)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == "Id").Value;
             bool isProductRemoved = _orderRepository.IsProductRemoved(id,Guid.Parse(userId));
             if(!isProductRemoved)
             {
@@ -274,99 +264,113 @@ namespace Order_Service.Services
         }
         public ErrorDTO IsProductExistsInCart(WishListToCart cartTOWishList)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == "Id").Value;
             
-            Tuple<string, string> x = _orderRepository.IsProductExistInCart(cartTOWishList,Guid.Parse(userId));
-            switch (x.Item1)
+            Tuple<string, string> response = _orderRepository.IsProductExistInCart(cartTOWishList,Guid.Parse(userId));
+            switch (response.Item1)
             {
-                case ("wishlist"):
-                    return new ErrorDTO { type = x.Item1, description = "Wish List with Id not found" };
-                case ("product"):
-                    return new ErrorDTO { type = x.Item1, description = "Product with Id not found" };
+                case (Constants.Wishlist):
+                    return new ErrorDTO { type = response.Item1, description = "Wish List with Id not found" };
+                case (Constants.Product):
+                    return new ErrorDTO { type = response.Item1, description = "Product with Id not found" };
                 default:
                     return null;
             }
         }
-        public async Task<CheckOutResponse> CheckOutCart(CheckOutCart checkOutCart)
+        public async Task<int?> CheckOutCart(CheckOutCart checkOutCart)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
             Cart cart = _orderRepository.GetCartProducts(Guid.Parse(userId));
             if(cart.Product.Count() == 0)
             {
                 return null;
             }
-            using HttpClient client = _httpClientFactory.CreateClient("product");
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
             string accessToken = AccessToken(userId);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
 
             HttpResponseMessage response = client.PostAsync($"/api/check-out", new StringContent(JsonConvert.SerializeObject(checkOutCart),
-                        Encoding.UTF8, "application/json")).Result;
-            string result1 = await response.Content.ReadAsStringAsync();
-            var s2 = JsonConvert.DeserializeObject(result1).ToString();
-            var dd2 = JsonConvert.DeserializeObject<CheckOutResponseDTO>(s2);
-            var add = JsonConvert.SerializeObject(dd2.Address);
+                        Encoding.UTF8, Constants.ContentType)).Result;
+            string responseString = await response.Content.ReadAsStringAsync();
+            string responseString1 = JsonConvert.DeserializeObject(responseString).ToString();
+            CheckOutResponseDTO checkOutResponseDTO = JsonConvert.DeserializeObject<CheckOutResponseDTO>(responseString1);
+            string stringResponse = JsonConvert.SerializeObject(checkOutResponseDTO.Address);
             List<ProductQuantity> products = new List<ProductQuantity>();
-            foreach (var item in cart.Product)
+            foreach (Product item in cart.Product)
             {
                 products.Add(new ProductQuantity() {Id=item.ProductId,Quantity=item.Quantity });
             }
             
             HttpResponseMessage response1 = client.PostAsync($"/api/cart/products/price", new StringContent(JsonConvert.SerializeObject(products),
-                        Encoding.UTF8, "application/json")).Result;
+                        Encoding.UTF8, Constants.ContentType)).Result;
 
             string result = await response1.Content.ReadAsStringAsync();
-            var s1 = JsonConvert.DeserializeObject(result).ToString();
-            var dd1 = JsonConvert.DeserializeObject<List<ProductPrice>>(s1);
+            string productResponse = JsonConvert.DeserializeObject(result).ToString();
+            List<ProductPrice> productPrice = JsonConvert.DeserializeObject<List<ProductPrice>>(productResponse);
             
             float amount = 0;
-            foreach (var item in dd1)
+            foreach (ProductPrice item in productPrice)
             {
-                var x = cart.Product.Where(find => find.ProductId == item.Id).First();
+                Product x = cart.Product.Where(find => find.ProductId == item.Id).First();
                 float price = (float)x.Quantity * item.Price;
                 amount = amount + price;
             }
-            string paymentType = dd2.Payment.ExpiryDate == null ? "UPI Payment" : "Debit Card";
+            string paymentType = checkOutResponseDTO.Payment.ExpiryDate == null ? "UPI Payment" : "Debit Card";
+            int c = _orderRepository.GetBillNo();
             Bill payment = new Bill()
             {
+                CartId = cart.Id,
                 OrderValue = amount,
-                PaymentType = paymentType,
-                Id = Guid.NewGuid(),
-                ShippingAddress=dd2.Address.ToString()
+                PaymentId = checkOutCart.PaymentId,
+                AddressId=checkOutCart.AddressId
             };
-            int billNo = _orderRepository.GenerateBillNo(payment,cart.Id);
+            cart.BillNo = c; 
+            int billNo = _orderRepository.GenerateBillNo(cart, payment, cart.Id);
             CheckOutResponse checkOutResponse = new CheckOutResponse()
             {
                 PaymentType = paymentType,
                 OrderValue = amount,
                 BillNo = billNo,
-                ShippingAddress= add
-
+                ShippingAddress= checkOutCart.AddressId
             };
-            return checkOutResponse;
-
+            return c;
         }
-        public async Task<ErrorDTO> IsQunatityLeft()
+        public async Task<ErrorDTO> IsQunatityLeft(Guid id, int quantity)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
-            Cart cart = _orderRepository.GetCartProducts(Guid.Parse(userId));
             List<ProductQuantity> productQuantities = new List<ProductQuantity>();
-            foreach (var item in cart.Product)
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
+            if (id == Guid.Empty)
+            {
+                Cart cart = _orderRepository.GetCartProducts(Guid.Parse(userId));
+
+                foreach (var item in cart.Product)
+                {
+                    ProductQuantity productQuantity = new ProductQuantity()
+                    {
+                        Id = item.ProductId,
+                        Quantity = item.Quantity
+                    };
+                    productQuantities.Add(productQuantity);
+                }
+            }
+            else
             {
                 ProductQuantity productQuantity = new ProductQuantity()
                 {
-                    Id=item.ProductId,
-                    Quantity=item.Quantity
+                    Id = id,
+                    Quantity = quantity
                 };
                 productQuantities.Add(productQuantity);
             }
-            using HttpClient client = _httpClientFactory.CreateClient("product");
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
            
             string accessToken = AccessToken(userId);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
             HttpResponseMessage response = client.PostAsync($"/api/cart/products/quantity", new StringContent(JsonConvert.SerializeObject(productQuantities),
-                                  Encoding.UTF8, "application/json")).Result;
+                                  Encoding.UTF8, Constants.ContentType)).Result;
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception("Product Service is unavailable");
@@ -380,11 +384,12 @@ namespace Order_Service.Services
                 {
                     return new ErrorDTO() { type = "Product", description = $"Product id {dd.Id}, Out of stock {dd.Quantity}" };
                 }
-                return new ErrorDTO() {type="Product",description= $"Product id {dd.Id}, left Quantity {dd.Quantity}"};
-               
+                if(dd.Quantity == 0)
+                {
+                    return new ErrorDTO() { type = "Product", description = $"Product id {dd.Id}, Out of stock {dd.Quantity}" };
+                }
+                return new ErrorDTO() {type="Product",description= $"Product id {dd.Id}, left Quantity {dd.Quantity}"};  
             }
-
-            
             return null;
 
         }
@@ -398,14 +403,14 @@ namespace Order_Service.Services
             return null;
         }
 
-        public async Task<CheckOutResponse> CheckOut(SingleProductCheckOutDTO singleProductCheckOutDTO)
+        public async Task<int> CheckOut(SingleProductCheckOutDTO singleProductCheckOutDTO)
         {
-            using HttpClient client = _httpClientFactory.CreateClient("product");
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
 
             string accessToken = AccessToken(userId);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
             HttpResponseMessage response = await client.GetAsync($"/api/product/ocelot?id={singleProductCheckOutDTO.ProductId}&categoryId={singleProductCheckOutDTO.CategoryId}");  
             string result = await response.Content.ReadAsStringAsync();
 
@@ -421,7 +426,7 @@ namespace Order_Service.Services
                 PaymentId=singleProductCheckOutDTO.PaymentId
             };
             HttpResponseMessage response2 = client.PostAsync($"/api/check-out", new StringContent(JsonConvert.SerializeObject(checkOutCart),
-                        Encoding.UTF8, "application/json")).Result;
+                        Encoding.UTF8, Constants.ContentType)).Result;
             string result2 = await response2.Content.ReadAsStringAsync();
             var s2 = JsonConvert.DeserializeObject(result2).ToString();
             var dd2 = JsonConvert.DeserializeObject<CheckOutResponseDTO>(s2);
@@ -429,34 +434,36 @@ namespace Order_Service.Services
             string type = dd2.Payment.ExpiryDate == null ? "UPI Payment" : "Card Payment";
 
             object data = JsonConvert.DeserializeObject(result);
+            Guid id = Guid.NewGuid();
+            var v = _orderRepository.GetBillNo();
             Cart cart = new Cart()
             {
-                Id = Guid.NewGuid(),
+                Id = id,
                 UserId = Guid.Parse(userId),
-                BillNo = 1,
+                BillNo = v,
                 Bill = new List<Bill>(),
                 Product = new List<Product>(),
             };
             var value = (float)singleProductCheckOutDTO.Quantity * float.Parse(dd.type);
             Bill payment = new Bill()
             {
-                Id = Guid.NewGuid(),
                 OrderValue = value,
-                PaymentType= type,
-                BillNo = 1,
-                ShippingAddress= add
+                CartId = id,
+                PaymentId= singleProductCheckOutDTO.PaymentId,
+                //Id = v,
+                AddressId= singleProductCheckOutDTO.AddressId
             };
             Product product = new Product()
-            { 
+            {
                 Id = Guid.NewGuid(),
                 ProductId = singleProductCheckOutDTO.ProductId,
-                CartId = Guid.NewGuid(),
+                CartId = id,  //Guid.NewGuid(),
                 Quantity = singleProductCheckOutDTO.Quantity
             };
             cart.Bill.Add(payment);
             cart.Product.Add(product);
-            var v = _orderRepository.GetBillNo();
-            cart.BillNo = v;
+            
+           
              _orderRepository.CheckOut(cart, Guid.Parse(userId));
             ProductToCartDTO productToCartDTO = new ProductToCartDTO()
             {
@@ -465,22 +472,23 @@ namespace Order_Service.Services
                 CategoryId=singleProductCheckOutDTO.CategoryId
             };
             HttpResponseMessage response1 =  client.PutAsync($"/api/product/update", new StringContent(JsonConvert.SerializeObject(productToCartDTO),
-                                  Encoding.UTF8, "application/json")).Result;
+                                  Encoding.UTF8, Constants.ContentType)).Result;
 
             string result1 = await response.Content.ReadAsStringAsync();
-            if (!response1.IsSuccessStatusCode)
-            {
-                throw new Exception();
-            }
+            //if (!response1.IsSuccessStatusCode)
+            //{
+            //    throw new Exception("Product service is not available");
+            //}
             var s1 = JsonConvert.DeserializeObject(result).ToString();
             var dd1 = JsonConvert.DeserializeObject<QuantityResponse>(s);
-            return new CheckOutResponse()
-            {
-                BillNo= v,
-                OrderValue=value,
-                PaymentType= type,
-                ShippingAddress= add
-            };
+            return v;
+            //    new CheckOutResponse()
+            //{
+            //    BillNo= v,
+            //    OrderValue=value,
+            //    PaymentType= type,
+            //    ShippingAddress= singleProductCheckOutDTO.AddressId
+            //};
         }
         public void CreateCart(Guid id)
         {
@@ -509,13 +517,13 @@ namespace Order_Service.Services
                 };
                 productDetails.Add(product);
             }
-            using HttpClient client = _httpClientFactory.CreateClient("product");
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
 
             string accessToken = AccessToken(userId);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
             HttpResponseMessage response =  client.PostAsync($"/api/product/details",new StringContent(JsonConvert.SerializeObject(productDetails),
-                                  Encoding.UTF8, "application/json")).Result;
+                                  Encoding.UTF8, Constants.ContentType)).Result;
             if(!response.IsSuccessStatusCode)
             {
                 throw new Exception("Product Service is unavailable");
@@ -530,15 +538,20 @@ namespace Order_Service.Services
                 {
                     if(each.ProductId == item.Id)
                     {
-                        if(each.Quantity > int.Parse(item.Quantity))
-                        {
-                            item.Quantity = $"Quantity only left {each.Quantity}";
-                        }
-                        if(int.Parse(item.Quantity) == 0)
+                        
+                         if(int.Parse(item.Quantity) == 0)
                         {
                             item.Quantity = "Product out of stock";
                         }
-                        item.Quantity = each.Quantity.ToString();
+                        else if (each.Quantity > int.Parse(item.Quantity))
+                        {
+                            item.Quantity = $"Quantity only left {each.Quantity}";
+                        }
+                        else
+                        {
+                            item.Quantity = each.Quantity.ToString();
+                        }
+                        
                     }
                 }
             }
@@ -547,7 +560,7 @@ namespace Order_Service.Services
         }
         public ErrorDTO IsWishListExist(Guid id)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
             var x = IsUserExist();
             if (x != null )
             {
@@ -562,7 +575,7 @@ namespace Order_Service.Services
         }
         public async  Task<List<WishListProductDTO>> GetWishListProducts(Guid id)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
             var getProductsInWishList = _orderRepository.GetProductsInWishList(Guid.Parse(userId), id);
             if(getProductsInWishList == null)
             {
@@ -574,14 +587,14 @@ namespace Order_Service.Services
             {
                 productDetails.Add(item.ProductId);
             }
-            using HttpClient client = _httpClientFactory.CreateClient("product");
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
 
 
             string accessToken = AccessToken(userId);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
             HttpResponseMessage response = client.PostAsync($"/api/wish-list/product/details", new StringContent(JsonConvert.SerializeObject(productDetails),
-                                  Encoding.UTF8, "application/json")).Result;
+                                  Encoding.UTF8, Constants.ContentType)).Result;
             if(!response.IsSuccessStatusCode)
             {
                 throw new Exception("Product service is unavailable");
@@ -632,16 +645,16 @@ namespace Order_Service.Services
 
         public async Task<ErrorDTO> IsPurchaseDetailsExist(CheckOutCart checkOutCart)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
             var g = _orderRepository.IsCartExist(Guid.Parse(userId));    
-            using HttpClient client = _httpClientFactory.CreateClient("product");
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
 
             string accessToken = AccessToken(userId);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
             
             HttpResponseMessage response = client.PostAsync($"/api/check-out/details", new StringContent(JsonConvert.SerializeObject(checkOutCart),
-                                  Encoding.UTF8, "application/json")).Result;
+                                  Encoding.UTF8, Constants.ContentType)).Result;
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception("User service is unavailable");
@@ -666,12 +679,12 @@ namespace Order_Service.Services
         }
         public async Task<ErrorDTO> IsPurchaseDetailsExist(SingleProductCheckOutDTO singleProductCheckOutDTO)
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
-            using HttpClient client = _httpClientFactory.CreateClient("product");
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
 
             string accessToken = AccessToken(userId);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
 
             CheckOutCart checkOutCart = new CheckOutCart()
             {
@@ -679,7 +692,7 @@ namespace Order_Service.Services
                 PaymentId=singleProductCheckOutDTO.PaymentId
             };
             HttpResponseMessage response = client.PostAsync($"/api/check-out/details", new StringContent(JsonConvert.SerializeObject(checkOutCart),
-                                  Encoding.UTF8, "application/json")).Result;
+                                  Encoding.UTF8, Constants.ContentType)).Result;
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception("User service is unavailable");
@@ -694,9 +707,9 @@ namespace Order_Service.Services
             var dd = JsonConvert.DeserializeObject<ErrorDTO>(s);
             switch (dd.type)
             {
-                case ("Address"):
+                case (Constants.Address):
                     return new ErrorDTO { type = dd.type, description = dd.description };
-                case ("Payment"):
+                case (Constants.Payment):
                     return new ErrorDTO { type = dd.type, description = dd.description };
                 default:
                     return null;
@@ -708,11 +721,53 @@ namespace Order_Service.Services
         }
         public ErrorDTO IsUserExist()
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
             var t = _orderRepository.IsUserExist(Guid.Parse(userId));
             if(!t)
             {
                 return new ErrorDTO() {type="User",description="User Account deleted" };
+            }
+            return null;
+        }
+        public List<OrderResponseDTO> GetOrderDetails(int billNo)
+        {
+            Guid userId = Guid.Parse(_context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value);
+            List<Bill> s = new List<Bill>();
+            if (billNo == 0)
+            {
+                List<Bill> v = _orderRepository.GetOrderDetails(userId);
+                if(v.Count() == 0)
+                {
+                    return null;
+                }
+                s.AddRange(v);
+            }
+            else
+            {
+                Bill v = _orderRepository.GetOrderDetails(userId,billNo);
+                s.Add(v);
+            }
+            List<OrderResponseDTO> orderResponseDTOs = new List<OrderResponseDTO>();
+            foreach (var item in s)
+            {
+                OrderResponseDTO orderResponseDTO = new OrderResponseDTO()
+                {
+                    AddressId=item.AddressId,
+                    OrderValue=item.OrderValue,
+                    PaymentId=item.PaymentId,
+                    BillNo=item.Id
+                };
+                orderResponseDTOs.Add(orderResponseDTO);
+            }
+            return orderResponseDTOs;
+        }
+
+        public ErrorDTO IsOrderIdExist(int id)
+        {
+            bool isExist = _orderRepository.IsOrderIdExist(id);
+            if(!isExist)
+            {
+                return new ErrorDTO() {type="Bill",description="Bill id not found" };
             }
             return null;
         }

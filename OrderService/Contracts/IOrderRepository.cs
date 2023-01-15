@@ -37,7 +37,7 @@ namespace Order_Service.Contracts
 
         public Cart GetCartProducts(Guid id);
 
-        public int GenerateBillNo(Bill payment,Guid id);
+        public int GenerateBillNo(Cart cart, Bill bill, Guid id);
 
         public bool CheckWishList(Guid wishListId);
 
@@ -57,5 +57,11 @@ namespace Order_Service.Contracts
         public bool IsUserExist(Guid userId);
 
         public bool IsTheUserExist(Guid userId);
+
+        public List<Bill> GetOrderDetails(Guid userId);
+
+        public Bill GetOrderDetails(Guid userId,int billNo);
+
+        public bool IsOrderIdExist(int id);
     }
 }
