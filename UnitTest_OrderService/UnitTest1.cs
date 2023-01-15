@@ -319,7 +319,7 @@ namespace UnitTest_OrderService
             };
             var x = _userController.CheckOutCart(checkOutCart).Result;
             var r = Assert.IsType<ObjectResult>(x);
-            Assert.Equal(201, r.StatusCode);
+            Assert.Equal(201, r.StatusCode);     
         }
     }
 }
