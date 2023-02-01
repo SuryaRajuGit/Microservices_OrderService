@@ -20,142 +20,72 @@ namespace Order_Service.Repository
         }
         public void AddProduct(Product product, Guid userId)
         {
-            var x = _orderContext.Cart.Include(find => find.Product).Where(find => find.UserId == userId && find.BillNo == 0 ).FirstOrDefault();
-            product.CartId = x.Id;
+            Cart cart = _orderContext.Cart.Include(find => find.Product).Where(find => find.UserId == userId && find.BillNo == 0 ).FirstOrDefault();
+            product.CartId = cart.Id;
             product.Cart = null;
-            bool t = true;
-            //if(x.Product.Count() == 0)
-            //{
-            //    _orderContext.Product.Add(product);
-            //    _orderContext.SaveChanges();
-            //    t = false;
-
-            //}
-            var f = x.Product.Where(find => find.ProductId == product.ProductId).FirstOrDefault();
-            if(f != null && t)
+            Product product1 = cart.Product.Where(find => find.ProductId == product.ProductId).FirstOrDefault();
+            if(product1 != null )
             {
-                f.Quantity = f.Quantity + product.Quantity;
-                _orderContext.Product.Update(f);
+                product1.Quantity = product1.Quantity + product.Quantity;
+                _orderContext.Product.Update(product1);
                 _orderContext.SaveChanges();
-
             }
             else
             {
                 _orderContext.Product.Add(product);
                 _orderContext.SaveChanges();
             }
-            
-
-            //try
-            //{
-            //    _orderContext.SaveChanges();
-            //}
-            //catch (DbUpdateConcurrencyException ex)
-            //{
-            //        ex.Entries.Single().Reload();
-            //        _orderContext.SaveChanges();
-
-            //}
-
-
-            //Cart cartItem = _orderContext.Cart.Include(term => term.BillNo).Include(term => term.Product).Where(find => find.UserId == cart.UserId).FirstOrDefault();
-
-            //if (cartItem == null)
-            //{
-            //    foreach (var item in x.Product)
-            //    {
-            //        if (item.ProductId == x.Product.Select(item => item.ProductId).First())
-            //        {
-            //            item.Quantity = item.Quantity + x.Product.Select(src => src.Quantity).First();
-            //            _orderContext.Cart.Update(x);
-            //            break;
-            //        }
-            //    }
-            //    _orderContext.Cart.Add(cart);
-            //}
-            //else
-            //{
-            //    Guid CartId = cart.Product.Select(item => item.ProductId).First();
-            //    bool isProductExists = cartItem.Product.Any(find => find.ProductId == CartId);
-            //    if (isProductExists)
-            //    {
-            //        foreach (var item in cartItem.Product)
-            //        {
-            //            if (item.ProductId == cart.Product.Select(item => item.ProductId).First())
-            //            {
-            //                item.Quantity = item.Quantity + cart.Product.Select(src => src.Quantity).First();
-            //                _orderContext.Cart.Update(cartItem);  
-            //                break;
-            //            }
-            //        }
-            //    }
-            //    else
-            //    {
-            //        cartItem.Product = new List<Product>();
-            //        Product product = new Product
-            //        {
-            //            Id = Guid.NewGuid(),
-            //            Quantity=cart.Product.Select(item => item.Quantity).First(),
-            //            ProductId = cart.Product.Select(item => item.Id).First(),
-            //            CartId=cart.Id
-            //        };
-            //        cartItem.Product.Add(product);
-            //        _orderContext.Product.Add(product);
-            //    }
-            //    _orderContext.SaveChanges();
-            //}
-
         }
         public Cart GetAllProducstInCart(Guid id)
         {
-            var f = _orderContext.Cart.Include(term =>term.Product).Where(find => find.UserId == id && find.BillNo == 0).FirstOrDefault();
+            Cart cart = _orderContext.Cart.Include(term =>term.Product).Where(find => find.UserId == id && find.BillNo == 0).FirstOrDefault();
             
-            return f;
+            return cart;
         }
 
         public bool IsProductInCart(Guid id, Guid userId)
         {
-            var li = _orderContext.Cart.Include(term => term.Product).Where(find => find.UserId == userId && find.BillNo == 0).FirstOrDefault();
-            bool isthere = li.Product.Any(term => term.ProductId == id);
+            Cart cart = _orderContext.Cart.Include(term => term.Product.Where(sel =>sel.IsActive && sel.ProductId == id)).Where(find => find.UserId == userId && find.BillNo == 0 && find.IsActive).FirstOrDefault();
+            bool isthere = cart.Product.Any(term => term.ProductId == id);
             if (isthere)
             {
-                foreach (var term in li.Product)
+                foreach (Product term in cart.Product)
                 {
                     if (term.ProductId == id)
                     {
-                        var p = _orderContext.Product.Where(find => find.ProductId == id).FirstOrDefault();
-                        _orderContext.Product.Remove(p);
+                        Product product = cart.Product.Where(find => find.ProductId == id).FirstOrDefault();
+                        product.IsActive = false;
                         _orderContext.SaveChanges();
                         return true;
                     }
                 }
-         
             }
             return false;
         }
+        public bool GetCart(UpdateCart cart, Guid id)
+        {
+            Cart cart1 = _orderContext.Cart.Include(sel => sel.Product.Where(sel => sel.IsActive && sel.ProductId == cart.ProductId)).Where(find => find.IsActive
+             && find.UserId == id).FirstOrDefault();
+            if(cart1.Product.Count() == 0)
+            {
+                return false;
+            }
+            Product product = cart1.Product.Where(sel => sel.ProductId == cart.ProductId).FirstOrDefault();
+            product.Quantity = cart.Quantity;
+            _orderContext.SaveChanges();
+            return true;
+
+
+        }
         public void UpdateCart(Cart updateCart)
         {
-            //var lis = _orderContext.Cart.Include(term => term.Product).Where(find => find.UserId == updateCart.UserId && find.BillNo == 0).FirstOrDefault();
-            //// Guid id = lis.Product.Select(find => find.ProductId).First();
-
-            //var isTh = lis.Product.Where(find => find.ProductId == id).FirstOrDefault();
             _orderContext.Cart.Update(updateCart);
             _orderContext.SaveChanges();
-            //isTh.Quantity = isTh.Quantity + 1;
-            //if (isTh != null)
-            //{
-            //    _orderContext.Product.Update(isTh);
-            //    _orderContext.SaveChanges();
-            //    return true;
-            //}
-            //_orderContext.Cart.Update(updateCart);
-            //return false;
-
         }
         public bool IsWishListNameExists(WishList wishList)
         {
-            var b = _orderContext.WishList.Any(term => term.Name == wishList.Name && term.UserId == wishList.UserId);
-            if(!b)
+            bool isWishListIdExist = _orderContext.WishList.Any(term => term.Name == wishList.Name && term.IsActive && term.UserId == wishList.UserId);
+            if(!isWishListIdExist)
             {
                 _orderContext.WishList.Add(wishList);
                 _orderContext.SaveChanges();
@@ -166,10 +96,10 @@ namespace Order_Service.Repository
 
         public bool DeleteWishList(Guid id)
         {
-            var b = _orderContext.WishList.Any(find => find.Id == id);
-            if(b)
+            bool isWishListExist = _orderContext.WishList.Any(find => find.Id == id);
+            if(isWishListExist)
             {
-                var wish = _orderContext.WishList.First(find => find.Id == id);
+                WishList wish = _orderContext.WishList.First(find => find.Id == id);
                 _orderContext.WishList.Remove(wish);
                 _orderContext.SaveChanges();
                 return true;
@@ -178,52 +108,39 @@ namespace Order_Service.Repository
         }
         public bool SaveProductWishList(Entity.Model.WishListProduct productWishlist)
         {
-            var b = _orderContext.WishList.Include(find => find.WishListProduct).Where(find => find.Id == productWishlist.WishListId).FirstOrDefault();
-            var t = b.WishListProduct.Any(find => find.ProductId == productWishlist.ProductId);
-            if(t)
+            WishList wishlist = _orderContext.WishList.Include(find => find.WishListProduct).Where(find => find.Id == productWishlist.WishListId).FirstOrDefault();
+            bool isWishListExist = wishlist.WishListProduct.Any(find => find.ProductId == productWishlist.ProductId);
+            if(isWishListExist)
             {
                 return true;
             }
             _orderContext.WishListProduct.Add(productWishlist);
             _orderContext.SaveChanges();
             return false;
-            
-            //if(b == null)
-            //{
-            //    return new Tuple<string, string>("wishlist", productWishlist.WishListId.ToString());
-            //}
-            //var bo = b.WishListProduct.Where(find => find.ProductId == productWishlist.ProductId).FirstOrDefault();
-            //if(bo == null)
-            //{
-            //    return new Tuple<string, string>("product", productWishlist.ProductId.ToString());
-            //}
-            //_orderContext.WishListProduct.Add(productWishlist);
-            //_orderContext.SaveChanges();
-            //return new Tuple<string, string>(string.Empty,string.Empty);
         }
         public Tuple<string,string> DeleteProductWishList(Guid id, Guid productId)
         {
-            var x = _orderContext.WishList.Include(term =>term.WishListProduct).Where(find => find.Id == id).FirstOrDefault();
-            if (x == null)
+            WishList wishList = _orderContext.WishList.Include(term =>term.WishListProduct.Where(sel => sel.IsActive)).Where(find => find.Id == id).FirstOrDefault();
+            if (wishList == null)
             {
                 return new Tuple<string, string>("wishlist", id.ToString());
             }
-            var bo = x.WishListProduct.Where(find => find.ProductId == productId).FirstOrDefault();
-            if (bo == null)
+            WishListProduct wishListProduct = wishList.WishListProduct.Where(find => find.ProductId == productId).FirstOrDefault();
+            if (wishListProduct == null)
             {
                 return new Tuple<string, string>("product", productId.ToString());
             }
-            _orderContext.WishListProduct.Remove(bo);        
+            _orderContext.WishListProduct.Remove(wishListProduct);        
             _orderContext.SaveChanges();
             return new Tuple<string, string>(string.Empty, string.Empty);
         }
         public bool IsProductRemoved(Guid id, Guid userId)
         {
-            var i = _orderContext.Cart.Include(term => term.Product).Where(find => find.UserId == userId).FirstOrDefault();
-            var b = i.Product.Where(find => find.ProductId == id).FirstOrDefault();
-            if(b != null)
+            Cart cart = _orderContext.Cart.Include(term => term.Product).Where(find => find.UserId == userId).FirstOrDefault();
+            Product product = cart.Product.Where(find => find.ProductId == id).FirstOrDefault();
+            if(product != null)
             {
-                _orderContext.Product.Remove(b);
+                _orderContext.Product.Remove(product);
                 _orderContext.SaveChanges();
                 return true;
             }
@@ -231,11 +148,6 @@ namespace Order_Service.Repository
         }
         public int GenerateBillNo(Cart cart, Bill bill, Guid cartId)
         {
-            
-            //foreach (var item in x.Bill)
-            //{
-            //    item.Id = c;
-            //}
             Cart cart1 = new Cart()
             {
                 Id = Guid.NewGuid(),
@@ -250,26 +162,25 @@ namespace Order_Service.Repository
         public Tuple<string, string> IsProductExistInCart(WishListToCart cartTOWishList,Guid userId)
         {
             Guid wishListId = Guid.Parse(cartTOWishList.WishListId);
-            var x = _orderContext.WishList.Include(term => term.WishListProduct).Where(find => find.Id == wishListId).FirstOrDefault();
-            if (x == null)
+            WishList wishList = _orderContext.WishList.Include(term => term.WishListProduct).Where(find => find.Id == wishListId).FirstOrDefault();
+            if (wishList == null)
             {
                 return new Tuple<string, string>("wishlist", cartTOWishList.WishListId.ToString());
             }
-            var bo = x.WishListProduct.Where(find => find.ProductId == Guid.Parse(cartTOWishList.ProductId)).FirstOrDefault();
-            if (bo == null)
+            WishListProduct wishListProduct = wishList.WishListProduct.Where(find => find.ProductId == Guid.Parse(cartTOWishList.ProductId)).FirstOrDefault();
+            if (wishListProduct == null)
             {
                 return new Tuple<string, string>("product", cartTOWishList.ProductId.ToString());
             }
-            // x.WishListProduct.Where(find => find.ProductId == cartTOWishList.ProductId)
-            var xx = x.WishListProduct.Where(find => find.ProductId == Guid.Parse(cartTOWishList.ProductId)).First();
-            _orderContext.WishListProduct.Remove(xx);
-            var c = _orderContext.Cart.Include(src => src.Product).Where(find => find.UserId == userId && find.BillNo == 0).FirstOrDefault() ;   //.Select(s => s.Product.Where(s => s.ProductId == wishListId).FirstOrDefault()).FirstOrDefault();
-            var t = c.Product.Where(find => find.ProductId == Guid.Parse(cartTOWishList.ProductId)).FirstOrDefault();
+            WishListProduct wishListProduct1 = wishList.WishListProduct.Where(find => find.ProductId == Guid.Parse(cartTOWishList.ProductId)).First();
+            _orderContext.WishListProduct.Remove(wishListProduct1);
+            Cart cart = _orderContext.Cart.Include(src => src.Product).Where(find => find.UserId == userId && find.BillNo == 0).FirstOrDefault() ;   //.Select(s => s.Product.Where(s => s.ProductId == wishListId).FirstOrDefault()).FirstOrDefault();
+            Product product1 = cart.Product.Where(find => find.ProductId == Guid.Parse(cartTOWishList.ProductId)).FirstOrDefault();
             
-            if(t != null)
+            if(product1 != null)
             {
-                t.Quantity = t.Quantity + 1;
-                _orderContext.Product.Update(t);
+                product1.Quantity = product1.Quantity + 1;
+                _orderContext.Product.Update(product1);
             }
             else
             {
@@ -277,7 +188,7 @@ namespace Order_Service.Repository
                 {
                     ProductId = Guid.Parse(cartTOWishList.ProductId),
                     Id = Guid.NewGuid(),
-                    CartId=c.Id,
+                    CartId=cart.Id,
                     Quantity = 1
                 };
                 _orderContext.Product.Add(product);
@@ -287,29 +198,21 @@ namespace Order_Service.Repository
         }
         public int GetBillNo()
         {
-            var max = 0;
-            foreach (var item in _orderContext.Bill)
+            int max = 0;
+            foreach (Bill item in _orderContext.Bill)
             {
-                var t = item.Id;
-                if(t > max)
+                int billNo = item.Id;
+                if(billNo > max)
                 {
-                    max = t;
+                    max = billNo;
                 }
             }
             return max + 1;
         }
         public void CheckOut(Cart cart, Guid userId)
         {
-           // var o = _orderContext.Cart.Select(sel => sel.BillNo).Count() + 1;
-            //cart.BillNo = o;
-            //foreach (var item in cart.Bill)
-            //{
-            //    item.BillNo = o;
-            //}
-           // cart
             _orderContext.Cart.Add(cart);
             _orderContext.SaveChanges();
-           // return o;
         }
 
         public void CreateCart(Cart cart)
@@ -324,12 +227,12 @@ namespace Order_Service.Repository
         }
         public Cart GetCartProducts(Guid id)
         {
-            var o = _orderContext.Cart.Include(term => term.Product).Where(find => find.UserId == id && find.BillNo == 0).FirstOrDefault();
-            if (o == null)
+            Cart cart = _orderContext.Cart.Include(term => term.Product).Where(find => find.UserId == id && find.BillNo == 0).FirstOrDefault();
+            if (cart == null)
             {
                 return null;
             }
-            return o;
+            return cart;
             
         }
         public bool CheckWishList(Guid wishListId)
@@ -338,13 +241,13 @@ namespace Order_Service.Repository
         }
         public List<WishListProduct> GetProductsInWishList(Guid userId, Guid wishListId)
         {
-            var o = _orderContext.WishList.Include(term => term.WishListProduct).Where(find => find.Id == wishListId && find.UserId == userId).FirstOrDefault();
-            if(o == null)
+            WishList wishList = _orderContext.WishList.Include(term => term.WishListProduct).Where(find => find.Id == wishListId && find.UserId == userId).FirstOrDefault();
+            if(wishList == null)
             {
                 return null;
             }
-            var x = o.WishListProduct.ToList();
-            return x;
+            List<WishListProduct> productList = wishList.WishListProduct.ToList();
+            return productList;
         }
         public Guid GetWishlistId(string name)
         {
@@ -352,16 +255,16 @@ namespace Order_Service.Repository
         }
         public Cart? GetCart(Guid userId)
         {
-            var x = _orderContext.Cart.Include(src => src.Product).Where(find => find.UserId == userId && find.BillNo == 0).First();
-            return x;
+            Cart cart = _orderContext.Cart.Include(src => src.Product).Where(find => find.UserId == userId && find.BillNo == 0).First();
+            return cart;
 
         }
         public void DeleteUserData(Guid id)
         {
-            var x = _orderContext.Cart.Where(find => find.UserId == id).ToList();
-            _orderContext.Cart.RemoveRange(x);
-            var y =_orderContext.WishList.Where(find => find.UserId == id).ToList();
-            _orderContext.WishList.RemoveRange(y);
+            List<Cart> cartList = _orderContext.Cart.Where(find => find.UserId == id).ToList();
+            _orderContext.Cart.RemoveRange(cartList);
+            List<WishList> wishList =_orderContext.WishList.Where(find => find.UserId == id).ToList();
+            _orderContext.WishList.RemoveRange(wishList);
             _orderContext.SaveChanges();
         }
         public bool IsUserExist(Guid userId)
@@ -375,15 +278,14 @@ namespace Order_Service.Repository
 
         public List<Bill> GetOrderDetails(Guid userId)
         {
-            //return _orderContext.Cart.Include(src => src.Bill).Where(find => find.UserId == userId && find.BillNo != 0).Select(src => src.Bill).FirstOrDefault();
             List<Bill> bill = new List<Bill>();
-            foreach (var item in _orderContext.Cart.Include(src=>src.Bill).Where(find =>find.UserId == userId))
+            foreach (Cart item in _orderContext.Cart.Include(src=>src.Bill).Where(find =>find.UserId == userId))
             {
                 if(item.BillNo != 0)
                 {
-                    var b = item.Bill.First();
-                    b.Cart = null;
-                    bill.Add(b);
+                    Bill bill1 = item.Bill.First();
+                    bill1.Cart = null;
+                    bill.Add(bill1);
                 }
             }
             return bill;

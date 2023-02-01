@@ -63,5 +63,7 @@ namespace Order_Service.Contracts
         public Bill GetOrderDetails(Guid userId,int billNo);
 
         public bool IsOrderIdExist(int id);
+
+        public bool GetCart(UpdateCart cart, Guid id);
     }
 }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Order_Service.Entities.Model;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -6,9 +7,8 @@ using System.Threading.Tasks;
 
 namespace Order_Service.Entity.Model
 {
-    public class Bill
+    public class Bill : BaseModel
     {
-       
         public int Id { get; set; }
 
         public Guid CartId { get; set; }

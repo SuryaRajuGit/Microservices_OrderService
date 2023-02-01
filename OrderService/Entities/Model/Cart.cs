@@ -1,14 +1,14 @@
-﻿using System;
+﻿using Order_Service.Entities.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace Order_Service.Entity.Model
 {
-    public class Cart
+    public class Cart : BaseModel
     {
-        public Guid Id { get; set; }
-
+      
         public Guid UserId { get; set; }
 
         public int BillNo { get; set; }
