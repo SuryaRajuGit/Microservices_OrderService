@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Order_Service.Migrations
 {
-    public partial class n : Migration
+    public partial class @new : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -12,6 +12,11 @@ namespace Order_Service.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(nullable: false),
+                    CreateBy = table.Column<Guid>(nullable: false),
+                    UpdatedBy = table.Column<Guid>(nullable: false),
+                    CreatedDate = table.Column<DateTime>(nullable: false),
+                    UpdatedDate = table.Column<DateTime>(nullable: false),
+                    IsActive = table.Column<bool>(nullable: false),
                     UserId = table.Column<Guid>(nullable: false),
                     BillNo = table.Column<int>(nullable: false)
                 },
@@ -25,6 +30,11 @@ namespace Order_Service.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(nullable: false),
+                    CreateBy = table.Column<Guid>(nullable: false),
+                    UpdatedBy = table.Column<Guid>(nullable: false),
+                    CreatedDate = table.Column<DateTime>(nullable: false),
+                    UpdatedDate = table.Column<DateTime>(nullable: false),
+                    IsActive = table.Column<bool>(nullable: false),
                     UserId = table.Column<Guid>(nullable: false),
                     Name = table.Column<string>(nullable: true)
                 },
@@ -39,10 +49,15 @@ namespace Order_Service.Migrations
                 {
                     Id = table.Column<int>(nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    CreateBy = table.Column<Guid>(nullable: false),
+                    UpdatedBy = table.Column<Guid>(nullable: false),
+                    CreatedDate = table.Column<DateTime>(nullable: false),
+                    UpdatedDate = table.Column<DateTime>(nullable: false),
+                    IsActive = table.Column<bool>(nullable: false),
                     CartId = table.Column<Guid>(nullable: false),
                     OrderValue = table.Column<float>(nullable: false),
                     PaymentId = table.Column<Guid>(nullable: false),
-                    ShippingAddress = table.Column<string>(nullable: true)
+                    AddressId = table.Column<Guid>(nullable: false)
                 },
                 constraints: table =>
                 {
@@ -60,6 +75,11 @@ namespace Order_Service.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(nullable: false),
+                    CreateBy = table.Column<Guid>(nullable: false),
+                    UpdatedBy = table.Column<Guid>(nullable: false),
+                    CreatedDate = table.Column<DateTime>(nullable: false),
+                    UpdatedDate = table.Column<DateTime>(nullable: false),
+                    IsActive = table.Column<bool>(nullable: false),
                     CartId = table.Column<Guid>(nullable: false),
                     Quantity = table.Column<int>(nullable: false),
                     ProductId = table.Column<Guid>(nullable: false)
@@ -80,6 +100,11 @@ namespace Order_Service.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(nullable: false),
+                    CreateBy = table.Column<Guid>(nullable: false),
+                    UpdatedBy = table.Column<Guid>(nullable: false),
+                    CreatedDate = table.Column<DateTime>(nullable: false),
+                    UpdatedDate = table.Column<DateTime>(nullable: false),
+                    IsActive = table.Column<bool>(nullable: false),
                     WishListId = table.Column<Guid>(nullable: false),
                     ProductId = table.Column<Guid>(nullable: false)
                 },

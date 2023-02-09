@@ -33,7 +33,6 @@ namespace Order_Service.Services
 
         public OrderService( IHttpContextAccessor context,IOrderRepository orderRepository, IMapper mapper)
         {
-            //_httpClientFactory = httpClientFactory;
             _context = context;
             _mapper = mapper;
             _orderRepository = orderRepository;
@@ -46,14 +45,22 @@ namespace Order_Service.Services
             IHost host1 = hostBuilder1.Build();
             _httpClientFactory = host1.Services.GetRequiredService<IHttpClientFactory>();
         }
+        ///<summary>
+        /// checks the properties are valid or not 
+        ///</summary>
         public ErrorDTO ModelStateInvalid(ModelStateDictionary ModelState)
         {
             return new ErrorDTO
             {
                 type = ModelState.Keys.Select(src => src).FirstOrDefault(),
-                description = ModelState.Values.Select(src => src.Errors[0].ErrorMessage).FirstOrDefault()
+                statusCode = "400",
+                message= ModelState.Values.Select(src => src.Errors[0].ErrorMessage).FirstOrDefault()
+
             };
         }
+        ///<summary>
+        /// Generates access token if the user is authorised
+        ///</summary>
         public string AccessToken(string id)
         {
             JwtSecurityTokenHandler tokenhandler = new JwtSecurityTokenHandler();
@@ -76,13 +83,16 @@ namespace Order_Service.Services
             string tokenString = new JwtSecurityTokenHandler().WriteToken(token);
             return tokenString;
         }
+        ///<summary>
+        /// checks products in the cart exist or not
+        ///</summary>
         public async Task<ErrorDTO> CartProductsExist(List<ProductToCartDTO> productToCartDTOs)
         {
             string userId = _context.HttpContext.User.Claims.First(term => term.Type == Constants.Id).Value;
             Cart cart = _orderRepository.GetCartProducts(Guid.Parse(userId));
             if(cart == null)
             {
-                return new ErrorDTO() {type="Cart",description=$"Cart is Empty" };
+                return new ErrorDTO() {type="NoContent",message=$"Cart is Empty",statusCode="204" };
             }
 
             List<Guid> productIds = new List<Guid>();
@@ -90,13 +100,13 @@ namespace Order_Service.Services
             {
                 productIds.Add(item.ProductId);
             }
-            using HttpClient client = _httpClientFactory.CreateClient("product");
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
 
             string accessToken = AccessToken(userId);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
             HttpResponseMessage response = client.PostAsync($"/api/cart/products", new StringContent(JsonConvert.SerializeObject(productIds),
-                                  Encoding.UTF8, "application/json")).Result;
+                                  Encoding.UTF8, Constants.ContentType)).Result;
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception("Product service is unavailable");
@@ -105,24 +115,26 @@ namespace Order_Service.Services
             Guid id;
             if (!Guid.TryParse(result1, out id))
             {
-                return new ErrorDTO() { type = "Product", description = id + " Product id not found" };
+                return new ErrorDTO() { type = "NotFound", message = id + " Product id not found",statusCode="404" };
             }
             return null;
         }
-
-        public async Task<ErrorDTO> IsTheproductExists(Guid id,Guid categoryId)
+        ///<summary>
+        /// checks if the product exist or not 
+        ///</summary>
+        public async Task<ErrorDTO> IsTheproductExists(Guid id)
         {
-            using HttpClient client = _httpClientFactory.CreateClient("product");
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
             string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
             bool isUserExist = _orderRepository.IsTheUserExist(Guid.Parse(userId));
             if(!isUserExist)
             {
-                return new ErrorDTO() {type="User",description="User Account deleted" };
+                return new ErrorDTO() {type="NotFound",message="User not found",statusCode="404" };
             }
             string accessToken = AccessToken(userId);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",accessToken);
-            HttpResponseMessage response =  client.GetAsync($"/api/product/ocelot?id={id}&categoryId={categoryId}").Result;
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer,accessToken);
+            HttpResponseMessage response =  client.GetAsync($"/api/product/ocelot?id={id}").Result;
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception("Product Service is unavailable");
@@ -131,31 +143,31 @@ namespace Order_Service.Services
 
             string responseString = JsonConvert.DeserializeObject(result).ToString();
             QuantityResponse quantityResponse = JsonConvert.DeserializeObject<QuantityResponse>(responseString);
-            if(quantityResponse.type == "category")
-            {
-                return new ErrorDTO() { type = "Category", description = quantityResponse.description };
-            }
             if (quantityResponse.type == "product")
             {
-                return new ErrorDTO { type = "Product", description = quantityResponse.description };
+                return new ErrorDTO { type = "InSufficent", message = quantityResponse.description,statusCode="404" };
             }
             return null;
         }
+        ///<summary>
+        /// adds product to user cart
+        ///</summary>
         public void AddProduct(ProductToCartDTO productToCartDTO)
         {
             string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
-
             Product product = new Product()
             {
                 Id = Guid.NewGuid(),
                 ProductId= productToCartDTO.ProductId,
-                Quantity= productToCartDTO.Quantity,
+                Quantity= productToCartDTO.Quantity == 0 ? 1 : productToCartDTO.Quantity,
                 IsActive = true,
                 CreateBy = Guid.Parse(userId)
             };
             _orderRepository.AddProduct(product,Guid.Parse(userId));
         }
-
+        ///<summary>
+        /// checks if the product exist in the user cart
+        ///</summary>
         public ErrorDTO IsProductInCart(Guid id)
         {
             string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
@@ -164,31 +176,24 @@ namespace Order_Service.Services
             {
                 return null;
             }
-            return new ErrorDTO {type="Cart",description="Cart not contains Product with id" };
+            return new ErrorDTO {type="NotFound",message="Cart not contains Product with id",statusCode="404" };
         }
-
+        ///<summary>
+        /// updates product quantity in cart
+        ///</summary>
         public ErrorDTO UpdateProductQuantity(UpdateCart updateCart)
         {
             string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
             bool isCartQuantityUpdated = _orderRepository.GetCart(updateCart,Guid.Parse(userId));
             if(!isCartQuantityUpdated)
             {
-                return new ErrorDTO { type = "Product", description = "Product with id not found in Cart" };
+                return new ErrorDTO { type = "NotFound", message = "Product with id not found in Cart",statusCode="404" };
             }
             return null;
-            //Cart? cart = _orderRepository.GetCart(Guid.Parse(userId));
-            //bool isProductExist = cart.Product.Any(find =>find.ProductId == updateCart.ProductId);
-            //if (!isProductExist)
-            //{
-            //    return new ErrorDTO { type = "Product", description = "Product with id not found in Cart" };
-            //}
-            //foreach (Product item in cart.Product)
-            //{
-            //    item.Quantity = updateCart.Quantity;
-            //}  
-            // _orderRepository.UpdateCart(cart);
-            // return null;
         }
+        ///<summary>
+        /// checks wish-list name already exist or not
+        ///</summary>
         public ErrorDTO IsWishListNameExists(NewWishListProduct newWishListProduct)
         {
             string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
@@ -200,90 +205,117 @@ namespace Order_Service.Services
                 Name = newWishListProduct.Name,
                 WishListProduct = new List<WishListProduct>(),
                 IsActive = true,
-                CreatedDate = DateTime.Now
+                CreatedDate = DateTime.Now,
+                CreateBy = Guid.Parse(userId)
             };
-            WishListProduct wishListProduct = new WishListProduct() { Id = Guid.NewGuid(), ProductId = newWishListProduct.ProductId, WishListId = id };
+            WishListProduct wishListProduct = new WishListProduct() 
+            { Id = Guid.NewGuid(), ProductId = newWishListProduct.ProductId, WishListId = id,IsActive=true,CreateBy=Guid.Parse(userId),CreatedDate=DateTime.Now };
             wishList.WishListProduct.Add(wishListProduct);
             bool isWishListNameExists = _orderRepository.IsWishListNameExists(wishList);
+
             if(isWishListNameExists)
             {
                 return null;
             }
-            return new ErrorDTO {type="Wish List",description="Wish List name already exists" };
+            return new ErrorDTO {type="Conflict",message="Wish List name already exists",statusCode="409" };
         }
+        ///<summary>
+        /// Deletes wish-list 
+        ///</summary>
         public ErrorDTO DeleteWishList(Guid id)
         {
             bool deleteWishList = _orderRepository.DeleteWishList(id);
             if(!deleteWishList)
             {
-                return new ErrorDTO {type="Wish List",description="Wish list with id not found" };
+                return new ErrorDTO {type="NotFound",message="Wish list with id not found",statusCode="404" };
             }
             return null;
         }
+        ///<summary>
+        /// saves new wish-list 
+        ///</summary>
         public ErrorDTO SaveProductWishList(WishListproduct wishListProduct)
         {
-            string userId = _context.HttpContext.User.Claims.First(src => src.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
             Guid id = Guid.NewGuid();
             
-            WishListProduct productWishlist = new WishListProduct() { Id = Guid.NewGuid(),
-                ProductId = wishListProduct.ProductId, WishListId = wishListProduct.WishListId };
+            WishListProduct productWishlist = new WishListProduct() 
+            { Id = Guid.NewGuid(),
+                ProductId = wishListProduct.ProductId, WishListId = wishListProduct.WishListId 
+                ,IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreateBy = Guid.Parse(userId)
+            };
 
             bool saveProduct = _orderRepository.SaveProductWishList(productWishlist);
             if(saveProduct)
             {
-                return new ErrorDTO() {type="Product",description="Product already added to wish list" };
+                return new ErrorDTO() {type="Conflilct",message="Product already added to wish list",statusCode="409" };
             }
-            return null;
-            
+            return null;  
         }
+        ///<summary>
+        /// checks wish-list name exist or not
+        ///</summary>
         public ErrorDTO CheckWishList(Guid wishListId)
         {
             bool isWishListExist = _orderRepository.CheckWishList(wishListId);
             if(!isWishListExist)
             {
-                return new ErrorDTO() {type="Wish List",description="Wish list id not found" };
+                return new ErrorDTO() {type="NotFound",message="Wish list id not found",statusCode="404" };
             }
             return null;
         }
-
+        ///<summary>
+        /// Deletes product in user wish-list
+        ///</summary>
         public ErrorDTO DeleteProductWishList(Guid id, Guid productId)
         {
             Tuple<string,string> response = _orderRepository.DeleteProductWishList(id, productId);
             switch (response.Item1)
             {
                 case ("wishlist"):
-                    return new ErrorDTO { type = response.Item1, description = "Wish List with Id not found" };
+                    return new ErrorDTO { type = "NotFound", message = "Wish List with Id not found",statusCode="404" };
                 case ("product"):
-                    return new ErrorDTO { type = response.Item1, description = "Product with Id not found" };
+                    return new ErrorDTO { type = "NotFound", message = "Product with Id not found",statusCode="404" };
                 default:
                     return null;
             }
         }
+        ///<summary>
+        /// Deletes product in cart if the product id doesnt exist return not found
+        ///</summary>
         public ErrorDTO DeleteProductCart(Guid id)
         {
-            string userId = _context.HttpContext.User.Claims.First(src => src.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
             bool isProductRemoved = _orderRepository.IsProductRemoved(id,Guid.Parse(userId));
             if(!isProductRemoved)
             {
-                return new ErrorDTO() {type="Product",description="Product with id not found in the cart" };
+                return new ErrorDTO() {type="NotFound",message="Product with id not found in the cart",statusCode="404" };
             }
             return null;
         }
+        ///<summary>
+        /// Checks if the product exist in the cart or not
+        ///</summary>
         public ErrorDTO IsProductExistsInCart(WishListToCart cartTOWishList)
         {
-            string userId = _context.HttpContext.User.Claims.First(src => src.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
             
             Tuple<string, string> response = _orderRepository.IsProductExistInCart(cartTOWishList,Guid.Parse(userId));
             switch (response.Item1)
             {
                 case (Constants.Wishlist):
-                    return new ErrorDTO { type = response.Item1, description = "Wish List with Id not found" };
+                    return new ErrorDTO { type = "NotFound", message = "Wish List with Id not found" , statusCode = "404" };
                 case (Constants.Product):
-                    return new ErrorDTO { type = response.Item1, description = "Product with Id not found" };
+                    return new ErrorDTO { type = "NotFound", message = "Product with Id not found",statusCode="404" };
                 default:
                     return null;
             }
         }
+        ///<summary>
+        /// removes all products from cart and updates quantity in product service
+        ///</summary>
         public async Task<int?> CheckOutCart(CheckOutCart checkOutCart)
         {
             string userId = _context.HttpContext.User.Claims.First(src => src.Type == Constants.Id).Value;
@@ -330,7 +362,10 @@ namespace Order_Service.Services
                 CartId = cart.Id,
                 OrderValue = amount,
                 PaymentId = checkOutCart.PaymentId,
-                AddressId=checkOutCart.AddressId
+                AddressId=checkOutCart.AddressId,
+                IsActive =true,
+                CreatedDate = DateTime.Now,
+
             };
             cart.BillNo = billCount; 
             int billNo = _orderRepository.GenerateBillNo(cart, payment, cart.Id);
@@ -339,10 +374,14 @@ namespace Order_Service.Services
                 PaymentType = paymentType,
                 OrderValue = amount,
                 BillNo = billNo,
-                ShippingAddress= checkOutCart.AddressId
+                ShippingAddress= checkOutCart.AddressId,
+
             };
             return billCount;
         }
+        ///<summary>
+        /// Checks quantity of the product in product service and return error 
+        ///</summary>
         public async Task<ErrorDTO> IsQunatityLeft(Guid id, int quantity)
         {
             List<ProductQuantity> productQuantities = new List<ProductQuantity>();
@@ -351,7 +390,7 @@ namespace Order_Service.Services
             {
                 Cart cart = _orderRepository.GetCartProducts(Guid.Parse(userId));
 
-                foreach (Product item in cart.Product)
+                foreach (Product item in cart.Product.Where(sel =>sel.IsActive))
                 {
                     ProductQuantity productQuantity = new ProductQuantity()
                     {
@@ -389,34 +428,40 @@ namespace Order_Service.Services
                 ProductQuantity productQuantity = JsonConvert.DeserializeObject<ProductQuantity>(stringResponse);
                 if(productQuantity.Quantity == -1)
                 {
-                    return new ErrorDTO() { type = "Product", description = $"Product id {productQuantity.Id}, Out of stock {productQuantity.Quantity}" };
+                    return new ErrorDTO() { type = "BadRequest", message = $"Product id {productQuantity.Id}, Out of stock {productQuantity.Quantity}",statusCode="400" };
                 }
                 if(productQuantity.Quantity == 0)
                 {
-                    return new ErrorDTO() { type = "Product", description = $"Product id {productQuantity.Id}, Out of stock {productQuantity.Quantity}" };
+                    return new ErrorDTO() { type = "BadRequest", message = $"Product id {productQuantity.Id}, Out of stock {productQuantity.Quantity}",statusCode="400" };
                 }
-                return new ErrorDTO() {type="Product",description= $"Product id {productQuantity.Id}, left Quantity {productQuantity.Quantity}"};  
+                return new ErrorDTO() {type="BadRequest",message= $"Product id {productQuantity.Id}, left Quantity {productQuantity.Quantity}"};  
             }
             return null;
 
         }
-        public ErrorDTO isCartIdExist(Guid id)
+        ///<summary>
+        /// Checks card id exist or not
+        ///</summary>
+        public ErrorDTO IsCartIdExist(Guid id)
         {
             bool isCartExist = _orderRepository.IsCartExist(id);
             if(!isCartExist)
             {
-                return new ErrorDTO() {type="Cart",description="Cart not found with the "+id };
+                return new ErrorDTO() {type="NotFound",message ="Cart not found with the "+id,statusCode="400" };
             }
             return null;
         }
-
+        ///<summary>
+        /// Check-out single product and updates quantity in product service
+        ///</summary>
         public async Task<int> CheckOut(SingleProductCheckOutDTO singleProductCheckOutDTO)
         {
             using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            singleProductCheckOutDTO.Quantity = singleProductCheckOutDTO.Quantity == 0 ? 1 : singleProductCheckOutDTO.Quantity;
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
+            Guid userId = Guid.Parse(_context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value);
 
-            string accessToken = AccessToken(userId);
+            string accessToken = AccessToken(userId.ToString());
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
             HttpResponseMessage response = await client.GetAsync($"/api/product/ocelot?id={singleProductCheckOutDTO.ProductId}&categoryId={singleProductCheckOutDTO.CategoryId}");  
             string result = await response.Content.ReadAsStringAsync();
@@ -446,10 +491,14 @@ namespace Order_Service.Services
             Cart cart = new Cart()
             {
                 Id = id,
-                UserId = Guid.Parse(userId),
+                UserId =userId,
                 BillNo = bill,
                 Bill = new List<Bill>(),
                 Product = new List<Product>(),
+                CreateBy = userId,
+                CreatedDate = DateTime.Now,
+                IsActive=true
+
             };
             float value = (float)singleProductCheckOutDTO.Quantity * float.Parse(quantityResponse.type);
             Bill payment = new Bill()
@@ -457,25 +506,31 @@ namespace Order_Service.Services
                 OrderValue = value,
                 CartId = id,
                 PaymentId= singleProductCheckOutDTO.PaymentId,
-                AddressId= singleProductCheckOutDTO.AddressId
+                AddressId= singleProductCheckOutDTO.AddressId,
+                CreateBy = userId,
+                CreatedDate = DateTime.Now,
+                IsActive = true
             };
             Product product = new Product()
             {
                 Id = Guid.NewGuid(),
                 ProductId = singleProductCheckOutDTO.ProductId,
-                CartId = id,  //Guid.NewGuid(),
-                Quantity = singleProductCheckOutDTO.Quantity
+                CartId = id,  
+                Quantity = singleProductCheckOutDTO.Quantity,
+                CreateBy = userId,
+                CreatedDate = DateTime.Now,
+                IsActive = true
             };
             cart.Bill.Add(payment);
             cart.Product.Add(product);
             
            
-             _orderRepository.CheckOut(cart, Guid.Parse(userId));
+             _orderRepository.CheckOut(cart,(userId));
             ProductToCartDTO productToCartDTO = new ProductToCartDTO()
             {
                 Quantity=singleProductCheckOutDTO.Quantity,
                 ProductId=singleProductCheckOutDTO.ProductId,
-                CategoryId=singleProductCheckOutDTO.CategoryId
+               
             };
             HttpResponseMessage response1 =  client.PutAsync($"/api/product/update", new StringContent(JsonConvert.SerializeObject(productToCartDTO),
                                   Encoding.UTF8, Constants.ContentType)).Result;
@@ -485,25 +540,31 @@ namespace Order_Service.Services
             QuantityResponse quantityResponse1 = JsonConvert.DeserializeObject<QuantityResponse>(stringResult);
             return bill;
         }
+        ///<summary>
+        /// Creates cart for user
+        ///</summary>
         public void CreateCart(Guid id)
         {
             Cart cart = new Cart()
             {
                 Id = Guid.NewGuid(),
                 UserId = id,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreateBy= id
             };
             _orderRepository.CreateCart(cart);
         }
+        ///<summary>
+        /// retruns all products details in the user cart
+        ///</summary>
         public async  Task<List<ProductDTO>> GetProductsInCart()
         {
-            string userId = _context.HttpContext.User.Claims.First(i => i.Type == "Id").Value;
+            string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
             Cart cart = _orderRepository.GetAllProducstInCart(Guid.Parse(userId));
-            if(cart.Product.Count() == 0)
-            {
-                return null;
-            }
+            
             List<ProductQuantity> productDetails = new List<ProductQuantity>();
-            foreach (Product item in cart.Product)
+            foreach (Product item in cart.Product.Where(sel =>sel.IsActive))
             {
                 ProductQuantity product = new ProductQuantity()
                 {
@@ -511,6 +572,10 @@ namespace Order_Service.Services
                     Quantity=item.Quantity
                 };
                 productDetails.Add(product);
+            }
+            if (productDetails.Count() == 0)
+            {
+                return null;
             }
             using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
@@ -529,7 +594,7 @@ namespace Order_Service.Services
             List<ProductDTO> productList = JsonConvert.DeserializeObject<List<ProductDTO>>(stringResponse);
             foreach (ProductDTO item in productList)
             {
-                foreach (Product each in cart.Product)
+                foreach (Product each in cart.Product.Where(sel => sel.IsActive ))
                 {
                     if(each.ProductId == item.Id)
                     {
@@ -551,33 +616,40 @@ namespace Order_Service.Services
             return productList;
 
         }
+        ///<summary>
+        /// Checks wish-list id exist or not
+        ///</summary>
         public ErrorDTO IsWishListExist(Guid id)
         {
             string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
             ErrorDTO isUserExist = IsUserExist();
             if (isUserExist != null )
             {
-                return new ErrorDTO() { type = "User", description = "User Account deleted" };
+                return new ErrorDTO() { type = "NotFound", message = "User not found",statusCode="404" };
             }
             List<WishListProduct> getProductsInWishList = _orderRepository.GetProductsInWishList(Guid.Parse(userId),id);
             if(getProductsInWishList == null)
             {
-                return new ErrorDTO(){type="Wish List",description="WishList id not found" };
+                return new ErrorDTO(){type="NotFound",message="WishList id not found" };
             }
             return null;
         }
+        ///<summary>
+        /// returns list or wish list products with user id
+        ///</summary>
         public async  Task<List<WishListProductDTO>> GetWishListProducts(Guid id)
         {
             string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
             List<WishListProduct> getProductsInWishList = _orderRepository.GetProductsInWishList(Guid.Parse(userId), id);
-            if(getProductsInWishList == null)
-            {
-                return null;
-            }
+            
             List<Guid> productDetails = new List<Guid>();
-            foreach (WishListProduct item in getProductsInWishList)
+            foreach (WishListProduct item in getProductsInWishList.Where(sel => sel.IsActive))
             {
                 productDetails.Add(item.ProductId);
+            }
+            if (productDetails.Count() == 0)
+            {
+                return null;
             }
             using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
@@ -630,15 +702,21 @@ namespace Order_Service.Services
             }
             return productList;
         }
+        ///<summary>
+        /// returns created wish-list id 
+        ///</summary>
         public Guid GetWishListId(string name)
         {
-            return _orderRepository.GetWishlistId(name);
+            Guid userId = Guid.Parse(_context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value);
+            return _orderRepository.GetWishlistId(name,userId);
         }
-
+        ///<summary>
+        /// Cheks if the purchase details exist in the user microservice
+        ///</summary>
         public async Task<ErrorDTO> IsPurchaseDetailsExist(CheckOutCart checkOutCart)
         {
             string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
-            bool isCartIdExist = _orderRepository.IsCartExist(Guid.Parse(userId));    
+            bool IsCartIdExist = _orderRepository.IsCartExist(Guid.Parse(userId));    
             using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
 
@@ -662,13 +740,16 @@ namespace Order_Service.Services
             switch (errorResponse.type)
             {
                 case ("Address"):
-                    return new ErrorDTO { type = errorResponse.type, description = "Address with Id not found" };
+                    return new ErrorDTO { type = "NotFound", message = "Address with Id not found",statusCode="404" };
                 case ("Payment"):
-                    return new ErrorDTO { type = errorResponse.type, description = "Payment with Id not found" };
+                    return new ErrorDTO { type = "NotFound", message = "Payment with Id not found",statusCode="404" };
                 default:
                     return null;
             }
         }
+        ///<summary>
+        /// Checks product details exist in the product microservice or not
+        ///</summary>
         public async Task<ErrorDTO> IsPurchaseDetailsExist(SingleProductCheckOutDTO singleProductCheckOutDTO)
         {
             string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
@@ -700,47 +781,62 @@ namespace Order_Service.Services
             switch (errorResponse.type)
             {
                 case (Constants.Address):
-                    return new ErrorDTO { type = errorResponse.type, description = errorResponse.description };
+                    return new ErrorDTO { type = "NotFound", message = errorResponse.message,statusCode="404" };
                 case (Constants.Payment):
-                    return new ErrorDTO { type = errorResponse.type, description = errorResponse.description };
+                    return new ErrorDTO { type = "NotFond", message = errorResponse.message,statusCode="404" };
                 default:
                     return null;
             }
         }
+        ///<summary>
+        /// Deletes user account 
+        ///</summary>
         public void DeleteUserData(Guid id)
         {
              _orderRepository.DeleteUserData(id);
         }
+        ///<summary>
+        /// Checks user exist or not
+        ///</summary>
         public ErrorDTO IsUserExist()
         {
             string userId = _context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value;
             bool isUserExist = _orderRepository.IsUserExist(Guid.Parse(userId));
             if(!isUserExist)
             {
-                return new ErrorDTO() {type="User",description="User Account deleted" };
+                return new ErrorDTO() {type="NotFound",message="User not found",statusCode="404" };
             }
             return null;
         }
-        public List<OrderResponseDTO> GetOrderDetails(int billNo)
+        ///<summary>
+        /// retusn order details 
+        ///</summary>
+        public OrderResponseDTO GetOrderDetails(int billNo)
         {
             Guid userId = Guid.Parse(_context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value);
-            List<Bill> billList = new List<Bill>();
-            if (billNo == 0)
+            Bill listBill = _orderRepository.GetOrderDetails(userId, billNo);
+            OrderResponseDTO orderResponseDTO = new OrderResponseDTO()
             {
-                List<Bill> listBill = _orderRepository.GetOrderDetails(userId);
-                if(listBill.Count() == 0)
-                {
-                    return null;
-                }
-                billList.AddRange(listBill);
-            }
-            else
+                AddressId = listBill.AddressId,
+                OrderValue = listBill.OrderValue,
+                PaymentId = listBill.PaymentId,
+                BillNo = listBill.Id
+            };
+            return orderResponseDTO;
+        }
+        ///<summary>
+        /// returns all order details of the user
+        ///</summary>
+        public List<OrderResponseDTO> GetOrderDetails()
+        {
+            Guid userId = Guid.Parse(_context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value);
+            List<Bill> listBill = _orderRepository.GetOrderDetails(userId);
+            if(listBill.Count() == 0)
             {
-                Bill listBill = _orderRepository.GetOrderDetails(userId,billNo);
-                billList.Add(listBill);
+                return null;
             }
             List<OrderResponseDTO> orderResponseDTOs = new List<OrderResponseDTO>();
-            foreach (Bill item in billList)
+            foreach (Bill item in listBill)
             {
                 OrderResponseDTO orderResponseDTO = new OrderResponseDTO()
                 {
@@ -753,13 +849,15 @@ namespace Order_Service.Services
             }
             return orderResponseDTOs;
         }
-
+        ///<summary>
+        /// Checks order id exist or not
+        ///</summary>
         public ErrorDTO IsOrderIdExist(int id)
         {
             bool isExist = _orderRepository.IsOrderIdExist(id);
             if(!isExist)
             {
-                return new ErrorDTO() {type="Bill",description="Bill id not found" };
+                return new ErrorDTO() {type="NotFound",message="Bill id not found",statusCode="404" };
             }
             return null;
         }

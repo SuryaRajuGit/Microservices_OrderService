@@ -9,10 +9,16 @@ namespace Order_Service.Entities.Dtos
 {
     public class UpdateCart
     {
+        ///<summary>
+        /// product id
+        ///</summary>
         [Required]
         [JsonProperty(PropertyName = "product_id")]
         public Guid ProductId { get; set; }
 
+        ///<summary>
+        /// quantity of the product
+        ///</summary>
         [Required]
         [JsonProperty(PropertyName = "quantity")]
         public int Quantity { get; set; }

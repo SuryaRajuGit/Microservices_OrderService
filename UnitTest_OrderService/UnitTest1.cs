@@ -48,7 +48,7 @@ namespace UnitTest_OrderService
             {
                 loggingBuilder.AddConsole((options) =>
                 {
-                    options.IncludeScopes = true; //AddAuthentication
+                    options.IncludeScopes = true; 
                 });
             });
             IHost host = hostBuilder.Build();
@@ -60,22 +60,21 @@ namespace UnitTest_OrderService
             });
 
 
-            // need to have access to the context
+  
             Claim claim = new Claim("role", "User");
             Claim claim1 = new Claim("Id", "8d0c1df7-a887-4453-8af3-799e4a7ed013");
-            ClaimsIdentity identity = new ClaimsIdentity(new[] { claim, claim1 }, "BasicAuthentication"); // this uses basic auth
+            ClaimsIdentity identity = new ClaimsIdentity(new[] { claim, claim1 }, "BasicAuthentication");
             ClaimsPrincipal principal = new ClaimsPrincipal(identity);
 
             GenericIdentity identityy = new GenericIdentity("some name", "test");
-            ClaimsPrincipal contextUser = new ClaimsPrincipal(identity); //add claims as needed
+            ClaimsPrincipal contextUser = new ClaimsPrincipal(identity); 
 
-            //...then set user and other required properties on the httpContext as needed
+
             DefaultHttpContext httpContext = new DefaultHttpContext()
             {
                 User = contextUser
             };
 
-            //Controller needs a controller context to access HttpContext
             HttpContextAccessor _httpContextAccessor = new HttpContextAccessor()
             {
                 HttpContext = httpContext
@@ -113,7 +112,8 @@ namespace UnitTest_OrderService
                     UserId = Guid.Parse(row[1]),
                     BillNo = int.Parse(row[2]),
                     Product = new List<Product>(),
-                    Bill = new List<Bill>()
+                    Bill = new List<Bill>(),
+                    IsActive=true
                 };
                 if(row[2] == "1")
                 {
@@ -123,7 +123,8 @@ namespace UnitTest_OrderService
                         OrderValue = int.Parse(row[3]),
                         PaymentId = Guid.Parse(row[4]),
                         AddressId = Guid.Parse(row[5]),
-                        CartId = Guid.Parse(row[0])
+                        CartId = Guid.Parse(row[0]),
+                        IsActive=true
                     };
                     cart.Bill.Add(bill);
                 }
@@ -132,13 +133,15 @@ namespace UnitTest_OrderService
                     Id = Guid.Parse(row[9]),
                     Name = row[10],
                     UserId = Guid.Parse(row[1]),
-                    WishListProduct = new List<WishListProduct>()
+                    WishListProduct = new List<WishListProduct>(),
+                    IsActive=true
                 };
                 WishListProduct wishListProduct = new WishListProduct()
                 {
                     Id = Guid.Parse(row[11]),
                     ProductId = Guid.Parse(row[8]),
-                    WishListId=Guid.Parse(row[9]) 
+                    WishListId=Guid.Parse(row[9]) ,
+                    IsActive=true
                 };
                 wishList.WishListProduct.Add(wishListProduct);
                 Product product = new Product()
@@ -146,7 +149,8 @@ namespace UnitTest_OrderService
                     Id = Guid.Parse(row[6]),
                     ProductId = Guid.Parse(row[8]),
                     Quantity = int.Parse(row[7]),
-                    CartId= Guid.Parse(row[0])
+                    CartId= Guid.Parse(row[0]),
+                    IsActive=true
                 };
                 
                 cart.Product.Add(product);
@@ -157,17 +161,28 @@ namespace UnitTest_OrderService
         }
 
         [Fact]
-        public void AddProductCart_Test()
+        public async Task AddProductCart_Test()
         {
             ProductToCartDTO productToCartDTO = new ProductToCartDTO()
             {
                 Quantity = 1,
-                ProductId = Guid.Parse("B08AD56A-46E8-40B4-88A9-1A2CE2DFF94A"),
-                CategoryId = Guid.Parse("A0BB058B-5217-4217-9FB2-4F75E15D2CCF")
+                ProductId = Guid.Parse("4FA3D2FA-FEA1-4A86-A8CF-E8B4817D35FC"),
+                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
             };
-            ActionResult response = _userController.AddProductCart(productToCartDTO).Result;
+            ProductToCartDTO productToCartDTO1 = new ProductToCartDTO()
+            {
+                Quantity = 1,
+                ProductId = Guid.Parse("4FA3D2FA-FEA1-4A86-A8CF-E8B4817D35FE"),
+                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
+            };
+            ActionResult response =await  _userController.AddProductCart(productToCartDTO);
+            ActionResult response1 =await  _userController.AddProductCart(productToCartDTO1);
+
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
+            ObjectResult result1= Assert.IsType<ObjectResult>(response1);
+
             Assert.Equal(200, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);
         }
         [Fact]
         public void CreateCart_Test()
@@ -182,12 +197,22 @@ namespace UnitTest_OrderService
         {
             UpdateCart updateCart = new UpdateCart()
             {
-                ProductId = Guid.Parse("B08AD56A-46E8-40B4-88A9-1A2CE2DFF94A"),
+                ProductId = Guid.Parse("4fa3d2fa-fea1-4a86-a8cf-e8b4817d35fc"),
+                Quantity = 1
+            };
+            UpdateCart updateCart1 = new UpdateCart()
+            {
+                ProductId = Guid.Parse("B08AD56A-46E8-40B4-88A9-1A2CE2DFF94B"),
                 Quantity = 1
             };
             IActionResult response = _userController.UpdateQuantity(updateCart);
+            IActionResult response1 = _userController.UpdateQuantity(updateCart1);
+
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
+            ObjectResult result1 = Assert.IsType<ObjectResult>(response1);
+
             Assert.Equal(200, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);
         }
         [Fact]
         public void CreateWishListProduct_Test()
@@ -198,9 +223,23 @@ namespace UnitTest_OrderService
                 Name = "Wish_1",
                 CategoryId = Guid.Parse("5B3D6E85-4B03-4856-BBB8-79C3D5C3AB1F")
             };
+            NewWishListProduct newWishListProduct1 = new NewWishListProduct()
+            {
+                ProductId = Guid.Parse("4FA3D2FA-FEA1-4A86-A8CF-E8B4817D35FC"),
+                Name = "Wish_1",
+                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
+            };
             ActionResult response = _userController.CreateWishListProduct(newWishListProduct).Result;
+            ActionResult response1 = _userController.CreateWishListProduct(newWishListProduct1).Result;
+            ActionResult response2 = _userController.CreateWishListProduct(newWishListProduct1).Result;
+
             ObjectResult result = Assert.IsType<ObjectResult>(response);
-            Assert.Equal(201, result.StatusCode);
+            ObjectResult result1 = Assert.IsType<ObjectResult>(response1);
+            ObjectResult result2 = Assert.IsType<ObjectResult>(response2);
+
+            Assert.Equal(404, result.StatusCode);
+            Assert.Equal(201, result1.StatusCode);
+            Assert.Equal(409, result2.StatusCode);
         }
         [Fact]
         public void DeleteUser_Test()
@@ -212,8 +251,13 @@ namespace UnitTest_OrderService
         public void DeleteWishList_Test()
         {
             IActionResult response = _userController.DeleteWishList(Guid.Parse("747f9ed2-47ff-4467-b635-b6079c935f88"));
+            IActionResult response1 = _userController.DeleteWishList(Guid.Parse("747f9ed2-47ff-4467-b635-b6079c935f89"));
+            
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
+            ObjectResult result1 = Assert.IsType<ObjectResult>(response1);
+            
             Assert.Equal(200, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);
         }
         [Fact]
         public void AddProductWishList_Test()
@@ -221,105 +265,181 @@ namespace UnitTest_OrderService
             WishListproduct wishListproduct = new WishListproduct()
             {
                 WishListId = Guid.Parse("747f9ed2-47ff-4467-b635-b6079c935f88"),
-                ProductId = Guid.Parse("C4EC41BB-A772-4909-8AEE-C3010F423132"),
-                CategoryId = Guid.Parse("5B3D6E85-4B03-4856-BBB8-79C3D5C3AB1F")
+                ProductId = Guid.Parse("4FA3D2FA-FEA1-4A86-A8CF-E8B4817D35FC"),
+                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
+            };
+            WishListproduct wishListproduct1 = new WishListproduct()
+            {
+                WishListId = Guid.Parse("747f9ed2-47ff-4467-b635-b6079c935f88"),
+                ProductId = Guid.Parse("2a52169a-e58f-42e8-bc0e-4603c361c589"),
+                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
+            };
+            WishListproduct wishListproduct2 = new WishListproduct()
+            {
+                WishListId = Guid.Parse("747f9ed2-47ff-4467-b635-b6079c935f89"),
+                ProductId = Guid.Parse("875DF98F-F0D1-406C-BA0E-AD76848E73C5"),
+                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
             };
             ActionResult response = _userController.AddProductWishList(wishListproduct).Result;
-            OkObjectResult result = Assert.IsType<OkObjectResult>(response);
-            Assert.Equal(200, result.StatusCode);
+            ActionResult response1 = _userController.AddProductWishList(wishListproduct1).Result;
+            ActionResult response2 = _userController.AddProductWishList(wishListproduct2).Result;
+
+
+            ObjectResult result = Assert.IsType<ObjectResult>(response);
+            OkObjectResult result1 = Assert.IsType<OkObjectResult>(response1);
+            ObjectResult result2 = Assert.IsType<ObjectResult>(response2);
+
+            Assert.Equal(200, result1.StatusCode);
+            Assert.Equal(409, result.StatusCode);
+            Assert.Equal(404, result2.StatusCode);
         }
         [Fact]
         public void DeleteProductInWishList_Test()
         {
             IActionResult response = _userController.DeleteProductInWishList(Guid.Parse("747f9ed2-47ff-4467-b635-b6079c935f88"),
-                Guid.Parse("b08ad56a-46e8-40b4-88a9-1a2ce2dff94a"));
+                Guid.Parse("4fa3d2fa-fea1-4a86-a8cf-e8b4817d35fc"));
+            IActionResult response1 = _userController.DeleteProductInWishList(Guid.Parse("747f9ed2-47ff-4467-b635-b6079c935f80"),
+               Guid.Parse("b08ad56a-46e8-40b4-88a9-1a2ce2dff94a"));
+
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
+            ObjectResult result1 = Assert.IsType<ObjectResult>(response1);
+
             Assert.Equal(200, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);
         }
         [Fact]
         public void GetProductsInCart_Test()
         {
             ActionResult response = _userController.GetProductsInCart().Result;
+
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
+
             Assert.Equal(200, result.StatusCode);
         }
         [Fact]
         public void GetWishListProducts_Test()
         {
             Guid id = Guid.Parse("747f9ed2-47ff-4467-b635-b6079c935f88");
+            Guid id1 = Guid.Parse("747f9ed2-47ff-4467-b635-b6079c935f89");
+
             ActionResult<List<WishListProductDTO>> response  = _userController.GetWishListProducts(id).Result;
+            ActionResult<List<WishListProductDTO>> response1  = _userController.GetWishListProducts(id1).Result;
+
             OkObjectResult result = Assert.IsType<OkObjectResult>(response.Result);
+            ObjectResult result1 = Assert.IsType<ObjectResult>(response1.Result);
+            
             Assert.Equal(200, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);
         }
         [Fact]
         public void OrderDetails_Test()
         {
-            CheckOutCart cart = new CheckOutCart()
-            {
-                AddressId =Guid.Parse("9e610e23-4ad4-4d05-9dbb-5de774f72f91"),
-                PaymentId=Guid.Parse("a334b297-3cc6-4d30-a304-0d95f7299064")
-            };
             ActionResult response = _userController.GetProductsInCart().Result;
+
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
+
             Assert.Equal(200, result.StatusCode);
         }
         [Fact]
         public void OrderDetail_Test()
         {
             IActionResult response = _userController.OrderDetail(1);
+            IActionResult response1 = _userController.OrderDetail(100);
+
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
+            NotFoundObjectResult result1 = Assert.IsType<NotFoundObjectResult>(response1);
+
             Assert.Equal(200, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);
         }
         [Fact]
         public void DeleteProductCart_Test()
         {
-            CheckOutCart cart = new CheckOutCart()
-            {
-                AddressId = Guid.Parse("9e610e23-4ad4-4d05-9dbb-5de774f72f91"),
-                PaymentId = Guid.Parse("a334b297-3cc6-4d30-a304-0d95f7299064")
-            };
-            IActionResult response = _userController.DeleteProductCart(Guid.Parse("b08ad56a-46e8-40b4-88a9-1a2ce2dff94a"));
+            IActionResult response = _userController.DeleteProductCart(Guid.Parse("4fa3d2fa-fea1-4a86-a8cf-e8b4817d35fc"));
+            IActionResult response1 = _userController.DeleteProductCart(Guid.Parse("b08ad56a-46e8-40b4-88a9-1a2ce2dff94b"));
+
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
+            NotFoundObjectResult result1 = Assert.IsType<NotFoundObjectResult>(response1);
+
             Assert.Equal(200, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);
         }
         [Fact]
         public void MoveProductToCart_Test()
         {
             WishListToCart cart = new WishListToCart()
             {
-                ProductId = "b08ad56a-46e8-40b4-88a9-1a2ce2dff94a",
-                WishListId ="747f9ed2-47ff-4467-b635-b6079c935f88"
+                ProductId = "4fa3d2fa-fea1-4a86-a8cf-e8b4817d35fc",
+                WishListId = "747f9ed2-47ff-4467-b635-b6079c935f88"
+            };
+            WishListToCart cart1 = new WishListToCart()
+            {
+                ProductId = "b08ad56a-46e8-40b4-88a9-1a2ce2dff94b",
+                WishListId = "747f9ed2-47ff-4467-b635-b6079c935f88"
             };
             IActionResult response = _userController.MoveProductToCart(cart);
+            IActionResult response1 = _userController.MoveProductToCart(cart1);
+
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
+            ObjectResult result1 = Assert.IsType<ObjectResult>(response1);
+
             Assert.Equal(200, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);
         }
         [Fact]
-        public async Task OutProduct_Test()
+        public async Task CheckOutProduct_Test()
         {
+
+            SingleProductCheckOutDTO singleProductCheckOutDTO1 = new SingleProductCheckOutDTO()
+            {
+                AddressId = Guid.Parse("DF16FC14-296F-4E48-910D-AFA7BA1E747F"),
+                PaymentId = Guid.Parse("377D66FB-EACF-4637-9CC2-069AEF71FB4B"),
+                ProductId = Guid.Parse("4FA3D2FA-FEA1-4A86-A8CF-E8B4817D35FC"),
+                Quantity = 1,
+                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
+            };
             SingleProductCheckOutDTO singleProductCheckOutDTO = new SingleProductCheckOutDTO()
             {
-                AddressId = Guid.Parse("AFFB4EA1-0A8F-401C-848C-7436B98A1278"),
-                PaymentId = Guid.Parse("955B72B8-8DE2-4F4B-9612-588131EA9C3A"),
-                ProductId =Guid.Parse("B08AD56A-46E8-40B4-88A9-1A2CE2DFF94A"),
-                Quantity =1,
-                CategoryId = Guid.Parse("A0BB058B-5217-4217-9FB2-4F75E15D2CCF")
+                AddressId = Guid.Parse("DF16FC14-296F-4E48-910D-AFA7BA1E747E"),
+                PaymentId = Guid.Parse("377D66FB-EACF-4637-9CC2-069AEF71FB4B"),
+                ProductId = Guid.Parse("4FA3D2FA-FEA1-4A86-A8CF-E8B4817D35FC"),
+                Quantity = 1,
+                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
             };
+
             ActionResult response =await  _userController.CheckOutProduct(singleProductCheckOutDTO);
+            ActionResult response1 =await  _userController.CheckOutProduct(singleProductCheckOutDTO1);           
+
             ObjectResult result = Assert.IsType<ObjectResult>(response);
+            ObjectResult result1 = Assert.IsType<ObjectResult>(response1);
+
             Assert.Equal(201, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);
+   
+   
         }
         [Fact]
         public void CheckOutCart_Test()
         {
             CheckOutCart checkOutCart = new CheckOutCart()
             {
-                AddressId = Guid.Parse("AFFB4EA1-0A8F-401C-848C-7436B98A1278"),
-                PaymentId = Guid.Parse("955B72B8-8DE2-4F4B-9612-588131EA9C3A")
+                AddressId = Guid.Parse("E74C1BAA-1AE1-4425-9925-DF2054ED083E"),
+                PaymentId = Guid.Parse("377D66FB-EACF-4637-9CC2-069AEF71FB4B")
+            };
+
+            CheckOutCart checkOutCart1 = new CheckOutCart()
+            {
+                AddressId = Guid.Parse("DF16FC14-296F-4E48-910D-AFA7BA1E747F"),
+                PaymentId = Guid.Parse("377D66FB-EACF-4637-9CC2-069AEF71FB4B")
             };
             ActionResult response = _userController.CheckOutCart(checkOutCart).Result;
+            ActionResult response1 = _userController.CheckOutCart(checkOutCart1).Result;
+
             ObjectResult result = Assert.IsType<ObjectResult>(response);
-            Assert.Equal(201, result.StatusCode);     
+            ObjectResult result1 = Assert.IsType<ObjectResult>(response1);
+
+            Assert.Equal(201, result.StatusCode);
+            Assert.Equal(404, result1.StatusCode);     
         }
     }
 }

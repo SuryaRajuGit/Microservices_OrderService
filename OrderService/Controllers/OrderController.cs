@@ -24,13 +24,13 @@ namespace Order_Service.Controllers
         }
 
         ///<summary>
-        /// Add new product to cart
+        /// Add product to cart
         ///</summary>
         ///<return>Product added to cart successfully</return>
         [HttpPost]
         [Route("api/cart")]
         [Authorize(Roles = "User,Admin")]
-        public async Task<ActionResult> AddProductCart([FromBody] ProductToCartDTO productToCartDTO)
+        public async Task<ActionResult>  AddProductCart([FromBody] ProductToCartDTO productToCartDTO)
         {
             _logger.LogInformation("Adding product to cart started");
             if (!ModelState.IsValid)
@@ -41,7 +41,7 @@ namespace Order_Service.Controllers
             }
             try
             {
-                ErrorDTO isTheProductExists = await _orderService.IsTheproductExists(productToCartDTO.ProductId,productToCartDTO.CategoryId);
+                ErrorDTO isTheProductExists = await _orderService.IsTheproductExists(productToCartDTO.ProductId);
                 if (isTheProductExists != null)
                 {
                     _logger.LogError("Product id not found");
@@ -57,7 +57,7 @@ namespace Order_Service.Controllers
             if(response != null)
             {
                 _logger.LogInformation("No content");
-                return StatusCode(204,response);
+                return StatusCode(400,response);
             }
             _orderService.AddProduct(productToCartDTO);
             _logger.LogInformation("Product added to cart successfully");
@@ -141,7 +141,7 @@ namespace Order_Service.Controllers
                 ErrorDTO badRequest = _orderService.ModelStateInvalid(ModelState);
                 return BadRequest(badRequest);
             }
-            ErrorDTO isTheProductExists = await _orderService.IsTheproductExists(newWwishListProduct.ProductId, newWwishListProduct.CategoryId);
+            ErrorDTO isTheProductExists = await _orderService.IsTheproductExists(newWwishListProduct.ProductId);
             if (isTheProductExists != null)
             {
                 _logger.LogError("Product not found");
@@ -159,7 +159,7 @@ namespace Order_Service.Controllers
         }
 
         ///<summary>
-        /// Delete user
+        /// Delete user details
         ///</summary>
         [HttpDelete]
         [Route("api/user/{id}")]
@@ -213,7 +213,7 @@ namespace Order_Service.Controllers
             }
             try
             {
-                ErrorDTO isTheProductExists = await _orderService.IsTheproductExists(wishListProduct.ProductId, wishListProduct.CategoryId);
+                ErrorDTO isTheProductExists = await _orderService.IsTheproductExists(wishListProduct.ProductId);
                 if (isTheProductExists != null)
                 {
                     _logger.LogError("Product not found ");
@@ -249,7 +249,7 @@ namespace Order_Service.Controllers
         [HttpDelete]
         [Authorize(Roles = "Admin,User")]
         [Route("api/wish-list/{id}/product/{product-id}")]
-        public IActionResult DeleteProductInWishList([FromRoute] Guid id, [FromRoute(Name = "product-id")] Guid productId)
+        public IActionResult DeleteProductInWishList([FromRoute] Guid id, [FromRoute(Name = Constants.productId)] Guid productId)
         {
             _logger.LogInformation("Delete product in wish-list strted");
             if (!ModelState.IsValid)
@@ -292,6 +292,7 @@ namespace Order_Service.Controllers
             }
             _logger.LogInformation("Product moved from wish list to cart Successfully");
             return Ok("Product moved from wish list to cart Successfully");
+           
         }
 
         ///<summary>
@@ -312,7 +313,7 @@ namespace Order_Service.Controllers
             }
             try
             {
-                ErrorDTO isProductExist = await _orderService.IsTheproductExists(singleProductCheckOutDTO.ProductId,singleProductCheckOutDTO.CategoryId);
+                ErrorDTO isProductExist = await _orderService.IsTheproductExists(singleProductCheckOutDTO.ProductId);
                 if (isProductExist != null)
                 {
                     _logger.LogError("Not found");
@@ -373,7 +374,6 @@ namespace Order_Service.Controllers
                 _logger.LogError("Product service is unavailable");
                 return StatusCode(500,ex.Message);
             }
-            
             try
             {
                 ErrorDTO response = await _orderService.IsQunatityLeft(Guid.Empty,0);
@@ -391,8 +391,8 @@ namespace Order_Service.Controllers
             int? checkOutProduct =await _orderService.CheckOutCart(checkOutCart);           
             if(checkOutProduct == null)
             {
-                return StatusCode(204,"Cart is Empty");
                 _logger.LogInformation("Cart is empty");
+                return StatusCode(204,"Cart is Empty");    
             }
             _logger.LogError("Check out cart done successfully");
             return StatusCode(201,checkOutProduct);
@@ -433,9 +433,8 @@ namespace Order_Service.Controllers
         }
 
         ///<summary>
-        /// Get all products in cart 
+        /// Get all products in wish list 
         ///</summary>
-        ///<return>Products in cart reterived successfully</return>
         [HttpGet]
         [Authorize(Roles = "Admin,User")]
         [Route("api/wish-list/{id}")]
@@ -467,12 +466,11 @@ namespace Order_Service.Controllers
             
         }
         ///<summary>
-        /// Get all products in cart 
+        /// Get all order details of user
         ///</summary>
-        ///<return>Products in cart reterived successfully</return>
         [HttpGet]
         [Authorize(Roles = "Admin,User")]
-        [Route("api/order")]
+        [Route("api/bill")]
         public IActionResult OrderDetails()
         {
             _logger.LogInformation("Getting order details started");
@@ -483,7 +481,7 @@ namespace Order_Service.Controllers
                 return StatusCode(404, isUserExist);
             }
 
-            List<OrderResponseDTO> orderDetails = _orderService.GetOrderDetails(0);
+            List<OrderResponseDTO> orderDetails = _orderService.GetOrderDetails();
             if(orderDetails == null)
             {
                 _logger.LogInformation("No orders placed");
@@ -492,10 +490,13 @@ namespace Order_Service.Controllers
             _logger.LogInformation("Orders reterived successfully");
             return Ok(orderDetails);
         }
-        
+
+        ///<summary>
+        /// Get  order details of using order id
+        ///</summary>
         [HttpGet]
         [Authorize(Roles = "Admin,User")]
-        [Route("api/order/{id}")]
+        [Route("api/bill/{id}")]
         public IActionResult OrderDetail([FromRoute] int id)
         {
             _logger.LogInformation("Getting single order details started ");
@@ -511,7 +512,7 @@ namespace Order_Service.Controllers
                 _logger.LogError("Not Found ");
                 return NotFound(isOrderIdExist);
             }
-            List<OrderResponseDTO> orderDetails = _orderService.GetOrderDetails(id);
+            OrderResponseDTO orderDetails = _orderService.GetOrderDetails(id);
             _logger.LogInformation("All order details retrived successfully");
             return Ok(orderDetails);
         }

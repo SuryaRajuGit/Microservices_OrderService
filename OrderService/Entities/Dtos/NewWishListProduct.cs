@@ -9,16 +9,18 @@ namespace Order_Service.Entities.Dtos
 {
     public class NewWishListProduct
     {
+        ///<summary>
+        /// product id
+        ///</summary>
         [Required]
         [JsonProperty(PropertyName ="product_id")]
         public Guid ProductId { get; set; }
 
+        ///<summary>
+        /// Product name
+        ///</summary>
         [Required]
         [JsonProperty(PropertyName = "name")]
         public string Name { get; set; }
-
-        [Required]
-        [JsonProperty(PropertyName = "category_id")]
-        public Guid CategoryId { get; set; }
     }
 }

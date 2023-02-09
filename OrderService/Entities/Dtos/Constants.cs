@@ -28,5 +28,7 @@ namespace Order_Service.Entities.Dtos
         public const string Payment = "Payment";
 
         public const string URL = "http://localhost:5000";
+
+        public const string productId = "product-id";
     }
 }

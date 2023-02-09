@@ -7,8 +7,14 @@ namespace Order_Service.Entities.Dtos
 {
     public class QuantityResponse
     {
+        ///<summary>
+        /// quantity of the product 
+        ///</summary>
         public string type  { get; set; }
 
+        ///<summary>
+        /// description of the product
+        ///</summary>
         public string description { get; set; }
     }
 }
