@@ -916,7 +916,6 @@ namespace Order_Service.Services
                     PaymentId = item.PaymentId,
                     BillId = item.Id,
                     Product = prod.Products,
-                    
                 };
                 orderResponseDTOs.Add(orderResponseDTO);
             }
