@@ -383,7 +383,7 @@ namespace Order_Service.Repository
         ///</summary>
         public Bill GetOrderDetails(Guid userId, int billNo)
         {
-            return _orderContext.Bill.Where(find => find.Id == billNo && find.IsActive).First();
+            return _orderContext.Bill.Include(sel => sel.Cart).Where(find => find.Id == billNo && find.IsActive).First();
         }
         ///<summary>
         /// Checks order id exist or not
@@ -395,6 +395,10 @@ namespace Order_Service.Repository
         public List<Cart> GetOrderProductIds(Guid id)
         {
             return _orderContext.Cart.Include(sel => sel.Product).Where(sel => sel.IsActive && sel.UserId == id && sel.BillNo != 0).ToList();
+        }
+        public Cart GetCart(int i)
+        {
+            return _orderContext.Cart.Include(sel => sel.Product).Where(sel => sel.IsActive && sel.BillNo == i).First();
         }
     }
 }

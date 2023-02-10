@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using Order_Service.Entity.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Order_Service.Entities.Dtos
 {
-    public class OrderResponseDTO
+    public class SingleBillProductDTO
     {
         ///<summary>
         /// Bill no
@@ -19,7 +18,7 @@ namespace Order_Service.Entities.Dtos
         /// order value
         ///</summary>
         [JsonProperty(PropertyName = "order_value")]
-        public float OrderValue  { get; set; }
+        public float OrderValue { get; set; }
 
         ///<summary>
         /// Address id
@@ -36,7 +35,7 @@ namespace Order_Service.Entities.Dtos
         ///<summary>
         /// Product id
         ///</summary>
-        public List<BillProductsDTO> Product { get; set; }
-
+        [JsonProperty(PropertyName = "product")]
+        public BillProductsDTO Product { get; set; }
     }
 }

@@ -99,7 +99,7 @@ namespace UnitTest_OrderService
         }
         public void AddData()
         {
-            string path = @"C:\Users\Hp\source\repos\OrderService\OrderService\Entities\UnitTest_Files\TextFile.csv";
+            string path = @"..\..\..\..\..\OrderService\OrderService\Entities\UnitTest_Files\TextFile.csv";
             string ReadCSV = File.ReadAllText(path);
             string[] data = ReadCSV.Split('\r');
             foreach (string item in data)
@@ -337,10 +337,10 @@ namespace UnitTest_OrderService
             Assert.Equal(200, result.StatusCode);
         }
         [Fact]
-        public void OrderDetail_Test()
+        public async Task  OrderDetail_Test()
         {
-            IActionResult response = _userController.OrderDetail(1);
-            IActionResult response1 = _userController.OrderDetail(100);
+            IActionResult response =await _userController.OrderDetail(1);
+            IActionResult response1 =await _userController.OrderDetail(100);
 
             OkObjectResult result = Assert.IsType<OkObjectResult>(response);
             NotFoundObjectResult result1 = Assert.IsType<NotFoundObjectResult>(response1);

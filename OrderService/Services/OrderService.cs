@@ -52,7 +52,7 @@ namespace Order_Service.Services
         {
             return new ErrorDTO
             {
-                type = ModelState.Keys.Select(src => src).FirstOrDefault(),
+                type = "BadRequest",
                 statusCode = "400",
                 message= ModelState.Values.Select(src => src.Errors[0].ErrorMessage).FirstOrDefault()
 
@@ -331,7 +331,6 @@ namespace Order_Service.Services
             string accessToken = AccessToken(userId);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
 
-            //Api call to order microservice to get product details
             HttpResponseMessage response = client.PostAsync($"/api/check-out", new StringContent(JsonConvert.SerializeObject(checkOutCart),
                         Encoding.UTF8, Constants.ContentType)).Result;
             string responseString = await response.Content.ReadAsStringAsync();
@@ -343,7 +342,7 @@ namespace Order_Service.Services
             {
                 products.Add(new ProductQuantity() {Id=item.ProductId,Quantity=item.Quantity });
             }
-            //Api call to order microservice to get product microservice
+
             HttpResponseMessage response1 = client.PostAsync($"/api/cart/products/price", new StringContent(JsonConvert.SerializeObject(products),
                         Encoding.UTF8, Constants.ContentType)).Result;
 
@@ -688,21 +687,13 @@ namespace Order_Service.Services
                 }
                 else if(int.Parse(item.Quantity) == 0)
                 {
-                    wishListProductDTO.Id = item.Id;
-                    wishListProductDTO.Name = item.Name;
-                    wishListProductDTO.Description = item.Description;
-                    wishListProductDTO.Price = item.Price;
+                    wishListProductDTO = _mapper.Map<WishListProductDTO>(item);
                     wishListProductDTO.Qunatity = "Product is out of stock";
-                    wishListProductDTO.Asset = item.Asset;
                 }
                 else
                 {
-                    wishListProductDTO.Id = item.Id;
-                    wishListProductDTO.Name = item.Name;
-                    wishListProductDTO.Description = item.Description;
-                    wishListProductDTO.Price = item.Price;
+                    wishListProductDTO = _mapper.Map<WishListProductDTO>(item);
                     wishListProductDTO.Qunatity = item.Price.ToString();
-                    wishListProductDTO.Asset = item.Asset;
                 }
                 productList.Add(wishListProductDTO);
             }
@@ -817,18 +808,48 @@ namespace Order_Service.Services
         ///<summary>
         /// retusn order details 
         ///</summary>
-        public OrderResponseDTO GetOrderDetails(int billNo)
+        public async Task<OrderResponseDTO> GetOrderDetails(int billNo)
         {
             Guid userId = Guid.Parse(_context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value);
             Bill listBill = _orderRepository.GetOrderDetails(userId, billNo);
-            OrderResponseDTO orderResponseDTO = new OrderResponseDTO()
+            Cart cart= _orderRepository.GetCart(billNo);
+            List<ProductDetailsBodyDTO> ids = new List<ProductDetailsBodyDTO>();
+            ProductDetailsBodyDTO productDetailsBodyDTO = new ProductDetailsBodyDTO()
             {
-                AddressId = listBill.AddressId,
-                OrderValue = listBill.OrderValue,
-                PaymentId = listBill.PaymentId,
-                BillNo = listBill.Id
+                BillId = 1,
+                ProductIds = new List<Guid>()
             };
-            return orderResponseDTO;
+            productDetailsBodyDTO.ProductIds  = cart.Product.Select(sel => sel.ProductId).ToList();
+            ids.Add(productDetailsBodyDTO);
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
+
+            string accessToken = AccessToken(userId.ToString());
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
+
+
+            HttpResponseMessage response = client.PostAsync($"/api/bill/product/details", new StringContent(JsonConvert.SerializeObject(ids),
+                                  Encoding.UTF8, Constants.ContentType)).Result;
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception("Product service is unavailable");
+            }
+
+            string result = await response.Content.ReadAsStringAsync();
+            if (result == "")
+            {
+                return null;
+            }
+            List<BillProductsResponseDTO> stringResponse = JsonConvert.DeserializeObject<List<BillProductsResponseDTO>>(result);
+
+            OrderResponseDTO orderResponseDTO1 = _mapper.Map<OrderResponseDTO>(listBill);
+            orderResponseDTO1.Product = new List<BillProductsDTO>();
+            orderResponseDTO1.Product = stringResponse.Where(sel => sel.BillId == 1).Select(sel => sel.Products).FirstOrDefault();
+            foreach (BillProductsDTO item in orderResponseDTO1.Product)
+            {
+                item.Quantity = cart.Product.Where(sel => sel.ProductId == item.Id).Select(sel => sel.Quantity).First();
+            }
+            return orderResponseDTO1;
         }
         ///<summary>
         /// returns all order details of the user
@@ -845,6 +866,7 @@ namespace Order_Service.Services
             List<ProductDetailsBodyDTO> ids =new List<ProductDetailsBodyDTO>();
             foreach (Cart item in productIds.Where(sel => sel.IsActive))
             {
+
                 List<Guid> guidIds = item.Product.Select(sel => sel.ProductId).ToList();
                 ProductDetailsBodyDTO productDetailsBodyDTO = new ProductDetailsBodyDTO()
                 {
@@ -875,21 +897,24 @@ namespace Order_Service.Services
                 return null;
             }
             List<BillProductsResponseDTO> stringResponse = JsonConvert.DeserializeObject<List<BillProductsResponseDTO>>(result);
-           // ErrorDTO errorResponse = JsonConvert.DeserializeObject<ErrorDTO>(stringResponse);
             List<OrderResponseDTO> orderResponseDTOs = new List<OrderResponseDTO>();
             foreach (Bill item in listBill)
             {
+
                 BillProductsResponseDTO prod = stringResponse.Where(sel => sel.BillId == item.Id).First();
                 foreach (BillProductsDTO sel in prod.Products)
                 {
                     sel.Quantity = productIds.Where(sel => sel.BillNo == item.Id).Select(sel => sel.Product.Where(sel => sel.ProductId == sel.ProductId).Select(sel => sel.Quantity).FirstOrDefault()).FirstOrDefault();
                 };
+                
+                OrderResponseDTO orderResponseDTO1 = _mapper.Map<OrderResponseDTO>(item);
+                orderResponseDTO1.Product = prod.Products;
                 OrderResponseDTO orderResponseDTO = new OrderResponseDTO()
                 {
                     AddressId = item.AddressId,
                     OrderValue = item.OrderValue,
                     PaymentId = item.PaymentId,
-                    BillNo = item.Id,
+                    BillId = item.Id,
                     Product = prod.Products,
                     
                 };

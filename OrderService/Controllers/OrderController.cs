@@ -447,8 +447,8 @@ namespace Order_Service.Controllers
                 _logger.LogError("Not Found");
                 return StatusCode(404, isWishListExist);
             }
-            try
-            {
+            //try
+            //{
                 List<WishListProductDTO> response = await _orderService.GetWishListProducts(id);
                 if (response == null)
                 {
@@ -457,12 +457,12 @@ namespace Order_Service.Controllers
                 }
                 _logger.LogInformation("All products in wishlist reterived successfully");
                 return Ok(response);
-            }
-            catch(Exception ex)
-            {
+           // }
+            //catch(Exception ex)
+            //{
                 _logger.LogError("Product service is unavailable");
-                return StatusCode(500,ex.Message);
-            }
+            return StatusCode(500);//,ex.Message);
+            //}
             
         }
         ///<summary>
@@ -497,7 +497,7 @@ namespace Order_Service.Controllers
         [HttpGet]
         [Authorize(Roles = "Admin,User")]
         [Route("api/bill/{id}")]
-        public IActionResult OrderDetail([FromRoute] int id)
+        public async Task<ActionResult> OrderDetail([FromRoute] int id)
         {
             _logger.LogInformation("Getting single order details started ");
             ErrorDTO isUserExist = _orderService.IsUserExist();
@@ -512,7 +512,7 @@ namespace Order_Service.Controllers
                 _logger.LogError("Not Found ");
                 return NotFound(isOrderIdExist);
             }
-            OrderResponseDTO orderDetails = _orderService.GetOrderDetails(id);
+            OrderResponseDTO orderDetails =await _orderService.GetOrderDetails(id);
             _logger.LogInformation("All order details retrived successfully");
             return Ok(orderDetails);
         }

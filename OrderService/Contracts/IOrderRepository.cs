@@ -144,6 +144,11 @@ namespace Order_Service.Contracts
         ///</summary>
         public bool GetCart(UpdateCart cart, Guid id);
 
+        ///<summary>
+        /// Get order details of products
+        ///</summary>
         public List<Cart> GetOrderProductIds(Guid id);
+
+        public Cart GetCart(int i);
     }
 }

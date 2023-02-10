@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Order_Service.Entities.Dtos;
+using Order_Service.Entity.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +12,10 @@ namespace Order_Service.Mappers
     {
         public Mapper()
         {
-            //eateMap<WishListProductDTO, ProductDTO>().ReverseMap().ForMember(src=>src.Qunatity,term=>term.MapFrom(opt => 
+            CreateMap<WishListProductDTO, ProductDTO>().ReverseMap().ForMember(sel => sel.Qunatity, act => act.MapFrom(sel => ""));
+            CreateMap<OrderResponseDTO, Bill>().ReverseMap().ForMember(sel => sel.BillId, act => act.MapFrom(sel => sel.Id))
+               // .ForMember(sel => sel.Product, act => act.MapFrom(sel => new Product()))
+                ;
         }
     }
 }

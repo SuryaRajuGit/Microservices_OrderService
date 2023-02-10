@@ -144,7 +144,7 @@ namespace Order_Service.Contracts
         ///<summary>
         /// retusn order details 
         ///</summary>
-        public OrderResponseDTO GetOrderDetails(int billNo);
+        public Task<OrderResponseDTO> GetOrderDetails(int billNo);
 
         ///<summary>
         /// Checks order id exist or not
@@ -154,7 +154,6 @@ namespace Order_Service.Contracts
         ///<summary>
         /// retusn order details 
         ///</summary>
-
         public Task<List<OrderResponseDTO>> GetOrderDetails();
 
 
