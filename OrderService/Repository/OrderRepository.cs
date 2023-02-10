@@ -366,13 +366,13 @@ namespace Order_Service.Repository
         ///</summary>
         public List<Bill> GetOrderDetails(Guid userId)
         {
+
             List<Bill> bill = new List<Bill>();
             foreach (Cart item in _orderContext.Cart.Include(src=>src.Bill).Where(find =>find.UserId == userId && find.IsActive))
             {
                 if(item.BillNo != 0 && item.IsActive)
                 {
                     Bill bill1 = item.Bill.First();
-                    bill1.Cart = null;
                     bill.Add(bill1);
                 }
             }
@@ -391,6 +391,10 @@ namespace Order_Service.Repository
         public bool IsOrderIdExist(int id)
         {
             return _orderContext.Bill.Any(src => src.Id == id && src.IsActive);
+        }
+        public List<Cart> GetOrderProductIds(Guid id)
+        {
+            return _orderContext.Cart.Include(sel => sel.Product).Where(sel => sel.IsActive && sel.UserId == id && sel.BillNo != 0).ToList();
         }
     }
 }

@@ -154,7 +154,10 @@ namespace Order_Service.Contracts
         ///<summary>
         /// retusn order details 
         ///</summary>
-        public List<OrderResponseDTO> GetOrderDetails();
+
+        public Task<List<OrderResponseDTO>> GetOrderDetails();
+
+
 
 
     }

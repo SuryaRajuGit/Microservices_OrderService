@@ -104,6 +104,7 @@ namespace Order_Service.Services
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
 
             string accessToken = AccessToken(userId);
+            //Api call to product microservice to get product details
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
             HttpResponseMessage response = client.PostAsync($"/api/cart/products", new StringContent(JsonConvert.SerializeObject(productIds),
                                   Encoding.UTF8, Constants.ContentType)).Result;
@@ -134,6 +135,7 @@ namespace Order_Service.Services
             }
             string accessToken = AccessToken(userId);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer,accessToken);
+            // Api call to product microservice to get product details
             HttpResponseMessage response =  client.GetAsync($"/api/product/ocelot?id={id}").Result;
             if (!response.IsSuccessStatusCode)
             {
@@ -329,6 +331,7 @@ namespace Order_Service.Services
             string accessToken = AccessToken(userId);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
 
+            //Api call to order microservice to get product details
             HttpResponseMessage response = client.PostAsync($"/api/check-out", new StringContent(JsonConvert.SerializeObject(checkOutCart),
                         Encoding.UTF8, Constants.ContentType)).Result;
             string responseString = await response.Content.ReadAsStringAsync();
@@ -340,7 +343,7 @@ namespace Order_Service.Services
             {
                 products.Add(new ProductQuantity() {Id=item.ProductId,Quantity=item.Quantity });
             }
-            
+            //Api call to order microservice to get product microservice
             HttpResponseMessage response1 = client.PostAsync($"/api/cart/products/price", new StringContent(JsonConvert.SerializeObject(products),
                         Encoding.UTF8, Constants.ContentType)).Result;
 
@@ -415,6 +418,7 @@ namespace Order_Service.Services
            
             string accessToken = AccessToken(userId);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
+            //Api call to product microservice to get product details
             HttpResponseMessage response = client.PostAsync($"/api/cart/products/quantity", new StringContent(JsonConvert.SerializeObject(productQuantities),
                                   Encoding.UTF8, Constants.ContentType)).Result;
             if (!response.IsSuccessStatusCode)
@@ -463,6 +467,7 @@ namespace Order_Service.Services
 
             string accessToken = AccessToken(userId.ToString());
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
+            // Api call to product microservice to get product details
             HttpResponseMessage response = await client.GetAsync($"/api/product/ocelot?id={singleProductCheckOutDTO.ProductId}&categoryId={singleProductCheckOutDTO.CategoryId}");  
             string result = await response.Content.ReadAsStringAsync();
 
@@ -477,6 +482,7 @@ namespace Order_Service.Services
                 AddressId=singleProductCheckOutDTO.AddressId,
                 PaymentId=singleProductCheckOutDTO.PaymentId
             };
+            // Api call to product microservice to get        
             HttpResponseMessage response2 = client.PostAsync($"/api/check-out", new StringContent(JsonConvert.SerializeObject(checkOutCart),
                         Encoding.UTF8, Constants.ContentType)).Result;
             string result2 = await response2.Content.ReadAsStringAsync();
@@ -827,23 +833,65 @@ namespace Order_Service.Services
         ///<summary>
         /// returns all order details of the user
         ///</summary>
-        public List<OrderResponseDTO> GetOrderDetails()
+        public async Task<List<OrderResponseDTO>> GetOrderDetails()
         {
             Guid userId = Guid.Parse(_context.HttpContext.User.Claims.First(i => i.Type == Constants.Id).Value);
             List<Bill> listBill = _orderRepository.GetOrderDetails(userId);
-            if(listBill.Count() == 0)
+            if (listBill.Count() == 0)
             {
                 return null;
             }
+            List<Cart> productIds = _orderRepository.GetOrderProductIds(userId);
+            List<ProductDetailsBodyDTO> ids =new List<ProductDetailsBodyDTO>();
+            foreach (Cart item in productIds.Where(sel => sel.IsActive))
+            {
+                List<Guid> guidIds = item.Product.Select(sel => sel.ProductId).ToList();
+                ProductDetailsBodyDTO productDetailsBodyDTO = new ProductDetailsBodyDTO()
+                {
+                    BillId=item.BillNo,
+                    ProductIds= guidIds
+                };
+                ids.Add(productDetailsBodyDTO);
+            }
+
+            
+            using HttpClient client = _httpClientFactory.CreateClient(Constants.Product);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.ContentType));
+
+            string accessToken = AccessToken(userId.ToString());
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Constants.Bearer, accessToken);
+
+            
+            HttpResponseMessage response = client.PostAsync($"/api/bill/product/details", new StringContent(JsonConvert.SerializeObject(ids),
+                                  Encoding.UTF8, Constants.ContentType)).Result;
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception("Product service is unavailable");
+            }
+
+            string result = await response.Content.ReadAsStringAsync();
+            if (result == "")
+            {
+                return null;
+            }
+            List<BillProductsResponseDTO> stringResponse = JsonConvert.DeserializeObject<List<BillProductsResponseDTO>>(result);
+           // ErrorDTO errorResponse = JsonConvert.DeserializeObject<ErrorDTO>(stringResponse);
             List<OrderResponseDTO> orderResponseDTOs = new List<OrderResponseDTO>();
             foreach (Bill item in listBill)
             {
+                BillProductsResponseDTO prod = stringResponse.Where(sel => sel.BillId == item.Id).First();
+                foreach (BillProductsDTO sel in prod.Products)
+                {
+                    sel.Quantity = productIds.Where(sel => sel.BillNo == item.Id).Select(sel => sel.Product.Where(sel => sel.ProductId == sel.ProductId).Select(sel => sel.Quantity).FirstOrDefault()).FirstOrDefault();
+                };
                 OrderResponseDTO orderResponseDTO = new OrderResponseDTO()
                 {
-                    AddressId=item.AddressId,
-                    OrderValue=item.OrderValue,
-                    PaymentId=item.PaymentId,
-                    BillNo=item.Id
+                    AddressId = item.AddressId,
+                    OrderValue = item.OrderValue,
+                    PaymentId = item.PaymentId,
+                    BillNo = item.Id,
+                    Product = prod.Products,
+                    
                 };
                 orderResponseDTOs.Add(orderResponseDTO);
             }

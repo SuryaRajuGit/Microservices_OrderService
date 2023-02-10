@@ -167,13 +167,11 @@ namespace UnitTest_OrderService
             {
                 Quantity = 1,
                 ProductId = Guid.Parse("4FA3D2FA-FEA1-4A86-A8CF-E8B4817D35FC"),
-                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
             };
             ProductToCartDTO productToCartDTO1 = new ProductToCartDTO()
             {
                 Quantity = 1,
                 ProductId = Guid.Parse("4FA3D2FA-FEA1-4A86-A8CF-E8B4817D35FE"),
-                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
             };
             ActionResult response =await  _userController.AddProductCart(productToCartDTO);
             ActionResult response1 =await  _userController.AddProductCart(productToCartDTO1);
@@ -221,13 +219,11 @@ namespace UnitTest_OrderService
             {
                 ProductId = Guid.Parse("C4EC41BB-A772-4909-8AEE-C3010F423132"),
                 Name = "Wish_1",
-                CategoryId = Guid.Parse("5B3D6E85-4B03-4856-BBB8-79C3D5C3AB1F")
             };
             NewWishListProduct newWishListProduct1 = new NewWishListProduct()
             {
                 ProductId = Guid.Parse("4FA3D2FA-FEA1-4A86-A8CF-E8B4817D35FC"),
                 Name = "Wish_1",
-                CategoryId = Guid.Parse("4944226F-36A7-445F-A9E5-D5C2BA1F525F")
             };
             ActionResult response = _userController.CreateWishListProduct(newWishListProduct).Result;
             ActionResult response1 = _userController.CreateWishListProduct(newWishListProduct1).Result;

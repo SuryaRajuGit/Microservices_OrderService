@@ -143,5 +143,7 @@ namespace Order_Service.Contracts
         /// updates cart details and return bool
         ///</summary>
         public bool GetCart(UpdateCart cart, Guid id);
+
+        public List<Cart> GetOrderProductIds(Guid id);
     }
 }

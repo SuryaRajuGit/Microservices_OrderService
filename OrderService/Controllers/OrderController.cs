@@ -471,7 +471,7 @@ namespace Order_Service.Controllers
         [HttpGet]
         [Authorize(Roles = "Admin,User")]
         [Route("api/bill")]
-        public IActionResult OrderDetails()
+        public async Task<ActionResult> OrderDetails()
         {
             _logger.LogInformation("Getting order details started");
             ErrorDTO isUserExist = _orderService.IsUserExist();
@@ -481,7 +481,7 @@ namespace Order_Service.Controllers
                 return StatusCode(404, isUserExist);
             }
 
-            List<OrderResponseDTO> orderDetails = _orderService.GetOrderDetails();
+            List<OrderResponseDTO> orderDetails =await _orderService.GetOrderDetails();
             if(orderDetails == null)
             {
                 _logger.LogInformation("No orders placed");

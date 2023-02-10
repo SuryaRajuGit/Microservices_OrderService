@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Order_Service.Entity.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,6 +31,9 @@ namespace Order_Service.Entities.Dtos
         /// Payment id
         ///</summary>
         [JsonProperty(PropertyName = "payment_id")]
-        public Guid PaymentId { get; set; } 
+        public Guid PaymentId { get; set; }
+
+        public List<BillProductsDTO> Product { get; set; }
+
     }
 }
